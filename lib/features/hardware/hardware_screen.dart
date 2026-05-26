@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../providers/hardware_provider.dart';
+import '../../providers/live_session_provider.dart';
 import '../../services/hardware/hardware_service.dart';
 
 class HardwareScreen extends ConsumerWidget {
@@ -12,8 +13,8 @@ class HardwareScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statusAsync = ref.watch(hardwareStatusProvider);
     final current = ref.watch(hardwareServiceProvider).currentStatus;
-
     final status = statusAsync.valueOrNull ?? current;
+    final liveSession = ref.watch(liveSessionProvider);
 
     return Scaffold(
       backgroundColor: AppColors.warmCream,
@@ -22,13 +23,20 @@ class HardwareScreen extends ConsumerWidget {
           slivers: [
             SliverToBoxAdapter(child: _HardwareHeader()),
             SliverToBoxAdapter(
-              child: _ConnectionBadge(isConnected: status.isConnected),
+              child: _ConnectionBadge(status: status),
             ),
-            SliverToBoxAdapter(
-              child: _ChairIllustration(isConnected: status.isConnected),
+            if (liveSession != null)
+              SliverToBoxAdapter(
+                child: _LiveSessionCard(liveSession: liveSession),
+              ),
+            const SliverToBoxAdapter(
+              child: _ChairIllustration(),
             ),
             SliverToBoxAdapter(
               child: _StatusCards(status: status),
+            ),
+            SliverToBoxAdapter(
+              child: _ConnectButton(status: status),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
@@ -72,7 +80,10 @@ class _HardwareHeader extends StatelessWidget {
               ],
             ),
             child: const Center(
-              child: Text('?', style: TextStyle(color: AppColors.subtleText, fontWeight: FontWeight.w600)),
+              child: Text('?',
+                  style: TextStyle(
+                      color: AppColors.subtleText,
+                      fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -82,8 +93,8 @@ class _HardwareHeader extends StatelessWidget {
 }
 
 class _ConnectionBadge extends StatelessWidget {
-  final bool isConnected;
-  const _ConnectionBadge({required this.isConnected});
+  final HardwareStatus status;
+  const _ConnectionBadge({required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -107,9 +118,11 @@ class _ConnectionBadge extends StatelessWidget {
             width: 12,
             height: 12,
             decoration: BoxDecoration(
-              color: isConnected ? AppColors.sageGreen : AppColors.subtleText,
+              color: status.isConnected
+                  ? AppColors.sageGreen
+                  : AppColors.subtleText,
               shape: BoxShape.circle,
-              boxShadow: isConnected
+              boxShadow: status.isConnected
                   ? [
                       BoxShadow(
                         color: AppColors.sageGreen.withValues(alpha: 0.4),
@@ -123,11 +136,66 @@ class _ConnectionBadge extends StatelessWidget {
           const SizedBox(width: 12),
           Text('Status: ', style: AppTextStyles.titleMedium),
           Text(
-            isConnected ? 'Connected' : 'Disconnected',
+            status.isConnected ? 'Connected' : 'Disconnected',
             style: AppTextStyles.titleMedium.copyWith(
-              color: isConnected ? AppColors.sageGreen : AppColors.subtleText,
+              color: status.isConnected
+                  ? AppColors.sageGreen
+                  : AppColors.subtleText,
             ),
           ),
+          if (status.isConnected) ...[
+            const Spacer(),
+            Text(
+              status.isMatOnChair ? 'Mat on chair' : 'Mat removed',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: status.isMatOnChair
+                    ? AppColors.sageGreen
+                    : AppColors.terracotta,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LiveSessionCard extends StatelessWidget {
+  final LiveSession liveSession;
+  const _LiveSessionCard({required this.liveSession});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.sageGreen.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.sageGreen.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.fitness_center_outlined,
+              size: 20, color: AppColors.sageGreen),
+          const SizedBox(width: 12),
+          Text('Live session: ', style: AppTextStyles.titleMedium),
+          Text(
+            '${liveSession.repCount} reps',
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.sageGreen,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (liveSession.avgRepTimeSeconds > 0) ...[
+            const Spacer(),
+            Text(
+              '${liveSession.avgRepTimeSeconds.toStringAsFixed(1)}s avg',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
         ],
       ),
     );
@@ -135,169 +203,18 @@ class _ConnectionBadge extends StatelessWidget {
 }
 
 class _ChairIllustration extends StatelessWidget {
-  final bool isConnected;
-  const _ChairIllustration({required this.isConnected});
+  const _ChairIllustration();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      height: 280,
-      decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(24),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Image.asset(
+        'assets/images/chair_mat.png',
+        height: 320,
+        width: double.infinity,
+        fit: BoxFit.contain,
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Vase decoration (right side)
-          Positioned(
-            right: 24,
-            bottom: 24,
-            child: _Vase(),
-          ),
-          // Chair drawing
-          _ChairDrawing(isConnected: isConnected),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChairDrawing extends StatelessWidget {
-  final bool isConnected;
-  const _ChairDrawing({required this.isConnected});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(160, 220),
-      painter: _ChairPainter(isConnected: isConnected),
-    );
-  }
-}
-
-class _ChairPainter extends CustomPainter {
-  final bool isConnected;
-  _ChairPainter({required this.isConnected});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final woodPaint = Paint()
-      ..color = const Color(0xFFD4C8A8)
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final matPaint = Paint()
-      ..color = isConnected
-          ? AppColors.sageGreen.withValues(alpha: 0.8)
-          : AppColors.subtleText.withValues(alpha: 0.5)
-      ..style = PaintingStyle.fill;
-
-    // Back rest
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.15, 0, size.width * 0.7, size.height * 0.36),
-        const Radius.circular(10),
-      ),
-      woodPaint,
-    );
-
-    // Seat
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.05, size.height * 0.4, size.width * 0.9, size.height * 0.12),
-        const Radius.circular(6),
-      ),
-      woodPaint,
-    );
-
-    // Mat on seat
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.12,
-          size.height * 0.41,
-          size.width * 0.76,
-          size.height * 0.10,
-        ),
-        const Radius.circular(4),
-      ),
-      matPaint,
-    );
-
-    // Mat indicator dot
-    final dotPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.7)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(
-      Offset(size.width * 0.5, size.height * 0.46),
-      3,
-      dotPaint,
-    );
-
-    // Left front leg
-    canvas.drawLine(
-      Offset(size.width * 0.15, size.height * 0.52),
-      Offset(size.width * 0.12, size.height * 0.88),
-      woodPaint,
-    );
-    // Right front leg
-    canvas.drawLine(
-      Offset(size.width * 0.85, size.height * 0.52),
-      Offset(size.width * 0.88, size.height * 0.88),
-      woodPaint,
-    );
-    // Left back leg
-    canvas.drawLine(
-      Offset(size.width * 0.22, size.height * 0.52),
-      Offset(size.width * 0.20, size.height * 0.88),
-      woodPaint,
-    );
-    // Right back leg
-    canvas.drawLine(
-      Offset(size.width * 0.78, size.height * 0.52),
-      Offset(size.width * 0.80, size.height * 0.88),
-      woodPaint,
-    );
-
-    // Arm rests
-    canvas.drawLine(
-      Offset(size.width * 0.15, size.height * 0.36),
-      Offset(size.width * 0.15, size.height * 0.52),
-      woodPaint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.85, size.height * 0.36),
-      Offset(size.width * 0.85, size.height * 0.52),
-      woodPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ChairPainter old) => old.isConnected != isConnected;
-}
-
-class _Vase extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.eco_outlined, size: 32, color: AppColors.lightSage),
-        Container(
-          width: 20,
-          height: 30,
-          decoration: BoxDecoration(
-            color: AppColors.lightSage.withValues(alpha: 0.6),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(4),
-              bottom: Radius.circular(10),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -339,6 +256,75 @@ class _StatusCards extends StatelessWidget {
   }
 }
 
+class _ConnectButton extends ConsumerWidget {
+  final HardwareStatus status;
+  const _ConnectButton({required this.status});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isConnecting = ref.watch(hardwareConnectingProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: isConnecting
+              ? null
+              : () => _onTap(context, ref, status.isConnected),
+          style: FilledButton.styleFrom(
+            backgroundColor: status.isConnected
+                ? AppColors.terracotta
+                : AppColors.sageGreen,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: isConnecting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(
+                  status.isConnected ? 'Disconnect' : 'Connect to IncreMat',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onTap(
+      BuildContext context, WidgetRef ref, bool isConnected) async {
+    final service = ref.read(hardwareServiceProvider);
+    ref.read(hardwareConnectingProvider.notifier).state = true;
+    try {
+      if (isConnected) {
+        await service.disconnect();
+      } else {
+        await service.connect('');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Connection failed: $e')),
+        );
+      }
+    } finally {
+      ref.read(hardwareConnectingProvider.notifier).state = false;
+    }
+  }
+}
+
 class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -370,7 +356,8 @@ class _InfoCard extends StatelessWidget {
           Icon(icon, size: 20, color: iconColor),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(label, style: AppTextStyles.titleMedium.copyWith(fontSize: 13)),
+            child: Text(label,
+                style: AppTextStyles.titleMedium.copyWith(fontSize: 13)),
           ),
         ],
       ),

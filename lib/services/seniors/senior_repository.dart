@@ -33,7 +33,15 @@ class SeniorRepository {
     await _col.doc(seniorId).update({'dailyRepGoal': newGoal});
   }
 
+  Future<void> update(String seniorId, {required String name, required int age}) async {
+    await _col.doc(seniorId).update({'name': name, 'age': age});
+  }
+
   Future<void> delete(String seniorId) async {
+    final sessionsSnap = await _col.doc(seniorId).collection('sessions').get();
+    for (final doc in sessionsSnap.docs) {
+      await doc.reference.delete();
+    }
     await _col.doc(seniorId).delete();
   }
 }

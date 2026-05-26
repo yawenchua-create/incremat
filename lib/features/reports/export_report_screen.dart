@@ -8,8 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
-import '../../models/senior.dart';
-import '../../models/session_log.dart';
+import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 
 class ExportReportScreen extends ConsumerStatefulWidget {
@@ -28,7 +27,7 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
     super.initState();
     final now = DateTime.now();
     _startDate = DateTime(now.year, now.month, 1);
-    _endDate = DateTime(now.year, now.month + 1, 0); // last day of current month
+    _endDate = now;
   }
   bool _isGenerating = false;
 
@@ -72,10 +71,12 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
   }
 
   Future<Uint8List> _buildPdf() async {
-    final senior = ref.read(selectedSeniorProvider) ?? MockSeniors.betty;
+    final senior = ref.read(selectedSeniorProvider);
+    final insights = senior != null
+        ? ref.read(seniorInsightsProvider(senior.id))
+        : null;
     final doc = pw.Document();
 
-    // Prefer Noto Sans SC for CJK track names; fall back to Helvetica offline.
     late final pw.Font notoFont;
     late final pw.Font notoFontBold;
     try {
@@ -90,6 +91,12 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
     final espressoColor = PdfColor.fromHex('3E3636');
     final creamColor = PdfColor.fromHex('F7F3F0');
 
+    final totalReps = insights?.totalRepsThisMonth ?? 0;
+    final daysActive = insights?.daysActiveThisMonth ?? 0;
+    final totalDays = insights?.totalDaysThisMonth ?? 1;
+    final avgRepTime = insights?.avgRepTimeSeconds ?? 0.0;
+    final weeklyReps = insights?.weeklyReps ?? [];
+
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -97,7 +104,6 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
         build: (ctx) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header
             pw.Container(
               padding: const pw.EdgeInsets.all(20),
               decoration: pw.BoxDecoration(
@@ -117,89 +123,81 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
                   ),
                   pw.SizedBox(height: 4),
                   pw.Text(
-                    'IncreMat Data  •  ${senior.name}  •  $_dateRangeLabel',
+                    'IncreMat Data  •  ${senior?.name ?? '—'}  •  $_dateRangeLabel',
                     style: pw.TextStyle(font: notoFont, fontSize: 11, color: sageColor),
                   ),
                 ],
               ),
             ),
             pw.SizedBox(height: 20),
-
-            // Total Reps
             _pdfStatRow(
               notoFont: notoFont,
               notoFontBold: notoFontBold,
               label: 'Total Reps this Month',
-              value: '${MockSessionData.totalRepsThisMonth}',
+              value: '$totalReps',
               sub: 'Total Repetitions',
               sageColor: sageColor,
               espressoColor: espressoColor,
             ),
             pw.Divider(color: PdfColor.fromHex('E8E3DF')),
-
-            // Daily Consistency
             _pdfStatRow(
               notoFont: notoFont,
               notoFontBold: notoFontBold,
               label: 'Daily Consistency',
-              value: '${(MockSessionData.daysActiveThisMonth / MockSessionData.totalDaysThisMonth * 100).round()}%',
-              sub: 'Days with IncreMat  •  ${MockSessionData.daysActiveThisMonth}/${MockSessionData.totalDaysThisMonth} days',
+              value: '${(daysActive / totalDays * 100).round()}%',
+              sub: 'Days with IncreMat  •  $daysActive/$totalDays days',
               sageColor: sageColor,
               espressoColor: espressoColor,
             ),
             pw.Divider(color: PdfColor.fromHex('E8E3DF')),
-
-            // Speed trend
             _pdfStatRow(
               notoFont: notoFont,
               notoFontBold: notoFontBold,
-              label: 'Sit-to-Stand Speed Trend',
-              value: '${MockSessionData.speedImprovementSeconds}s',
-              sub: 'Improvement this month',
+              label: 'Sit-to-Stand Speed',
+              value: '${avgRepTime.toStringAsFixed(1)}s',
+              sub: 'Average rep time this month',
               sageColor: sageColor,
               espressoColor: espressoColor,
             ),
             pw.SizedBox(height: 20),
-
-            // Weekly reps table
             pw.Text(
               'Weekly Repetitions',
               style: pw.TextStyle(font: notoFontBold, fontSize: 14, color: espressoColor),
             ),
             pw.SizedBox(height: 8),
-            pw.Table(
-              border: pw.TableBorder.all(color: PdfColor.fromHex('E8E3DF'), width: 0.5),
-              children: [
-                pw.TableRow(
-                  decoration: pw.BoxDecoration(color: PdfColor.fromHex('D4DDD9')),
-                  children: List.generate(MockSessionData.weeklyReps.length, (i) =>
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(8),
-                      child: pw.Text(
-                        'Week ${i + 1}',
-                        style: pw.TextStyle(font: notoFontBold, fontSize: 10, color: espressoColor),
-                        textAlign: pw.TextAlign.center,
-                      ),
-                    ),
+            if (weeklyReps.isNotEmpty)
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColor.fromHex('E8E3DF'), width: 0.5),
+                children: [
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: PdfColor.fromHex('D4DDD9')),
+                    children: List.generate(weeklyReps.length, (i) {
+                      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                      return pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          i < days.length ? days[i] : 'Day ${i + 1}',
+                          style: pw.TextStyle(font: notoFontBold, fontSize: 10, color: espressoColor),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      );
+                    }),
                   ),
-                ),
-                pw.TableRow(
-                  children: MockSessionData.weeklyReps.map((reps) =>
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(8),
-                      child: pw.Text(
-                        '$reps',
-                        style: pw.TextStyle(font: notoFont, fontSize: 11, color: espressoColor),
-                        textAlign: pw.TextAlign.center,
+                  pw.TableRow(
+                    children: weeklyReps.map((reps) =>
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          '$reps',
+                          style: pw.TextStyle(font: notoFont, fontSize: 11, color: espressoColor),
+                          textAlign: pw.TextAlign.center,
+                        ),
                       ),
-                    ),
-                  ).toList(),
-                ),
-              ],
-            ),
+                    ).toList(),
+                  ),
+                ],
+              ),
             pw.Spacer(),
-
-            // Footer
             pw.Divider(color: PdfColor.fromHex('E8E3DF')),
             pw.SizedBox(height: 6),
             pw.Text(
@@ -247,7 +245,17 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final senior = ref.watch(selectedSeniorProvider) ?? MockSeniors.betty;
+    final senior = ref.watch(selectedSeniorProvider);
+    final insights = senior != null
+        ? ref.watch(seniorInsightsProvider(senior.id))
+        : null;
+
+    final totalReps = insights?.totalRepsThisMonth ?? 0;
+    final daysActive = insights?.daysActiveThisMonth ?? 0;
+    final totalDays = insights?.totalDaysThisMonth ?? 1;
+    final avgRepTime = insights?.avgRepTimeSeconds ?? 0.0;
+    final weeklyReps = insights?.weeklyReps ?? [];
+
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       appBar: AppBar(
@@ -272,12 +280,10 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    // Decorative branches
                     Align(
                       alignment: Alignment.centerRight,
                       child: Icon(Icons.eco, size: 48, color: AppColors.lightSage),
                     ),
-                    // Report preview card
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.cardSurface,
@@ -301,7 +307,7 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'IncreMat Data  •  ${senior.name}  •  $_dateRangeLabel',
+                              'IncreMat Data  •  ${senior?.name ?? '—'}  •  $_dateRangeLabel',
                               style: AppTextStyles.bodySmall,
                             ),
                             const SizedBox(height: 20),
@@ -309,34 +315,36 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
                             _ReportRow(
                               icon: Icons.directions_walk_outlined,
                               label: 'Total Reps this Month',
-                              value: '${MockSessionData.totalRepsThisMonth}',
+                              value: '$totalReps',
                               sub: 'Total Repetitions',
                             ),
                             const Divider(),
                             _ReportRow(
                               icon: Icons.calendar_today_outlined,
                               label: 'Daily Consistency',
-                              value: '${(MockSessionData.daysActiveThisMonth / MockSessionData.totalDaysThisMonth * 100).round()}%',
+                              value: '${(daysActive / totalDays * 100).round()}%',
                               sub: 'Days with IncreMat',
-                              trailing: _ConsistencyCircle(),
+                              trailing: _ConsistencyCircle(
+                                daysActive: daysActive,
+                                totalDays: totalDays,
+                              ),
                             ),
                             const Divider(),
                             _ReportRow(
                               icon: Icons.timer_outlined,
-                              label: 'Sit-to-Stand Speed Trend',
-                              value: '${MockSessionData.speedImprovementSeconds}s',
-                              sub: 'Improvement this month',
+                              label: 'Sit-to-Stand Speed',
+                              value: '${avgRepTime.toStringAsFixed(1)}s',
+                              sub: 'Average rep time this month',
                             ),
                             const SizedBox(height: 20),
                             Text('Weekly Repetitions', style: AppTextStyles.titleMedium),
                             const SizedBox(height: 12),
-                            _WeeklyBarChart(),
+                            _WeeklyBarChart(weeklyReps: weeklyReps),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Date range selector
                     Text('Select Date Range', style: AppTextStyles.titleMedium),
                     const SizedBox(height: 10),
                     GestureDetector(
@@ -366,7 +374,6 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
                 ),
               ),
             ),
-            // Share button
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: ElevatedButton(
@@ -453,9 +460,14 @@ class _ReportRow extends StatelessWidget {
 }
 
 class _ConsistencyCircle extends StatelessWidget {
+  final int daysActive;
+  final int totalDays;
+
+  const _ConsistencyCircle({required this.daysActive, required this.totalDays});
+
   @override
   Widget build(BuildContext context) {
-    final progress = MockSessionData.daysActiveThisMonth / MockSessionData.totalDaysThisMonth;
+    final progress = totalDays > 0 ? daysActive / totalDays : 0.0;
     return SizedBox(
       width: 52,
       height: 52,
@@ -473,7 +485,7 @@ class _ConsistencyCircle extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${MockSessionData.daysActiveThisMonth}',
+                '$daysActive',
                 style: AppTextStyles.titleMedium.copyWith(fontSize: 12),
               ),
               Text(
@@ -489,31 +501,39 @@ class _ConsistencyCircle extends StatelessWidget {
 }
 
 class _WeeklyBarChart extends StatelessWidget {
-  static final _groups = MockSessionData.weeklyReps.asMap().entries.map((e) {
-    return BarChartGroupData(
-      x: e.key,
-      barRods: [
-        BarChartRodData(
-          toY: e.value.toDouble(),
-          color: AppColors.sageGreen,
-          width: 28,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-        ),
-      ],
-    );
-  }).toList();
+  final List<int> weeklyReps;
+  const _WeeklyBarChart({required this.weeklyReps});
 
   @override
   Widget build(BuildContext context) {
+    if (weeklyReps.isEmpty) return const SizedBox.shrink();
+
+    final groups = weeklyReps.asMap().entries.map((e) {
+      return BarChartGroupData(
+        x: e.key,
+        barRods: [
+          BarChartRodData(
+            toY: e.value.toDouble(),
+            color: AppColors.sageGreen,
+            width: 28,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+          ),
+        ],
+      );
+    }).toList();
+
+    final maxReps = weeklyReps.isEmpty ? 10 : weeklyReps.reduce((a, b) => a > b ? a : b);
+    final maxY = (maxReps + 5).toDouble().clamp(10.0, double.infinity);
+
     return SizedBox(
       height: 160,
       child: BarChart(
         BarChartData(
-          maxY: 350,
+          maxY: maxY,
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: 100,
+            horizontalInterval: (maxY / 4).ceilToDouble(),
             getDrawingHorizontalLine: (_) => const FlLine(
               color: AppColors.divider,
               strokeWidth: 0.8,
@@ -524,7 +544,7 @@ class _WeeklyBarChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                interval: 100,
+                interval: (maxY / 4).ceilToDouble(),
                 reservedSize: 32,
                 getTitlesWidget: (v, _) =>
                     Text(v.toInt().toString(), style: AppTextStyles.caption),
@@ -533,16 +553,20 @@ class _WeeklyBarChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                getTitlesWidget: (v, _) => Text(
-                  'Week ${v.toInt() + 1}',
-                  style: AppTextStyles.caption,
-                ),
+                getTitlesWidget: (v, _) {
+                  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                  final i = v.toInt();
+                  return Text(
+                    i < days.length ? days[i] : '',
+                    style: AppTextStyles.caption,
+                  );
+                },
               ),
             ),
             topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
-          barGroups: _groups,
+          barGroups: groups,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
               getTooltipColor: (_) => AppColors.espresso,

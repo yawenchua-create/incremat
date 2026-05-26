@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
-import '../../models/session_log.dart';
+import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../reports/export_report_screen.dart';
 
@@ -12,21 +12,30 @@ class InsightsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final seniors = ref.watch(seniorsProvider);
+    final hasSenior = ref.watch(selectedSeniorProvider) != null;
+
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _InsightsHeader()),
-            SliverToBoxAdapter(child: _SeniorSwitcher()),
-            SliverToBoxAdapter(child: _MobilityChart()),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                child: Text('Rep Statistics', style: AppTextStyles.headlineSmall),
-              ),
-            ),
-            SliverToBoxAdapter(child: _RepStats()),
+            if (seniors.isEmpty) ...[
+              SliverToBoxAdapter(child: _InsightsEmptyState()),
+            ] else ...[
+              SliverToBoxAdapter(child: _SeniorSwitcher()),
+              SliverToBoxAdapter(child: _MobilityChart()),
+              if (hasSenior) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                    child: Text('Rep Statistics', style: AppTextStyles.headlineSmall),
+                  ),
+                ),
+                SliverToBoxAdapter(child: _RepStats()),
+              ],
+            ],
             SliverToBoxAdapter(
               child: _InsightsCta(
                 onTap: () => Navigator.of(context).push(
@@ -37,6 +46,44 @@ class InsightsScreen extends ConsumerWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InsightsEmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.bar_chart_outlined, size: 48, color: AppColors.lightSage),
+          const SizedBox(height: 16),
+          Text(
+            'No data yet',
+            style: AppTextStyles.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add a loved one on the Home tab to start\ntracking their sit-to-stand progress.',
+            style: AppTextStyles.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -100,17 +147,20 @@ class _InsightsHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Performance Trends', style: AppTextStyles.headlineLarge),
-              const SizedBox(height: 2),
-              Text(
-                'Mobility Improvement Over 12 Weeks',
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Performance Trends', style: AppTextStyles.headlineLarge),
+                const SizedBox(height: 2),
+                Text(
+                  'Daily rep activity for the current week',
+                  style: AppTextStyles.bodySmall,
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -124,7 +174,7 @@ class _InsightsHeader extends StatelessWidget {
                 ),
               ],
             ),
-            child: Text('Last 12 Weeks', style: AppTextStyles.labelMedium),
+            child: Text('This Week', style: AppTextStyles.labelMedium),
           ),
         ],
       ),
@@ -132,14 +182,21 @@ class _InsightsHeader extends StatelessWidget {
   }
 }
 
-class _MobilityChart extends StatelessWidget {
-  static final _spots = List.generate(
-    MockSessionData.mobilityScoresW1toW12.length,
-    (i) => FlSpot(i.toDouble(), MockSessionData.mobilityScoresW1toW12[i].toDouble()),
-  );
+class _MobilityChart extends ConsumerWidget {
+  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final senior = ref.watch(selectedSeniorProvider);
+    if (senior == null) return const SizedBox.shrink();
+    final insights = ref.watch(seniorInsightsProvider(senior.id));
+    final weeklyReps = insights.weeklyReps;
+    final consistencyPct = insights.consistencyPercent.toInt();
+
+    final maxReps = weeklyReps.isEmpty ? 10 : weeklyReps.reduce((a, b) => a > b ? a : b);
+    final maxY = (maxReps + 5).toDouble().clamp(10.0, double.infinity);
+    final interval = (maxY / 4).ceilToDouble();
+
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
@@ -164,11 +221,14 @@ class _MobilityChart extends StatelessWidget {
                 children: [
                   Container(
                     width: 20,
-                    height: 2,
-                    color: AppColors.chartLine,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.sageGreen,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                   const SizedBox(width: 6),
-                  Text('Mobility Score', style: AppTextStyles.caption),
+                  Text('Daily Reps', style: AppTextStyles.caption),
                 ],
               ),
               Container(
@@ -180,10 +240,10 @@ class _MobilityChart extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.arrow_upward, size: 12, color: AppColors.sageGreen),
+                    const Icon(Icons.check_circle_outline, size: 12, color: AppColors.sageGreen),
                     const SizedBox(width: 3),
                     Text(
-                      '${MockSessionData.overallImprovementPercent.toInt()}%',
+                      '$consistencyPct%',
                       style: AppTextStyles.titleMedium.copyWith(
                         color: AppColors.sageGreen,
                         fontSize: 13,
@@ -195,22 +255,18 @@ class _MobilityChart extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            'Overall Improvement',
-            style: AppTextStyles.caption,
-          ),
+          Text('Weekly Consistency', style: AppTextStyles.caption),
           const SizedBox(height: 16),
           SizedBox(
             height: 160,
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: 100,
+            child: BarChart(
+              BarChartData(
+                maxY: maxY,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 25,
-                  getDrawingHorizontalLine: (_) => FlLine(
+                  horizontalInterval: interval,
+                  getDrawingHorizontalLine: (_) => const FlLine(
                     color: AppColors.divider,
                     strokeWidth: 0.8,
                   ),
@@ -220,7 +276,7 @@ class _MobilityChart extends StatelessWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: 25,
+                      interval: interval,
                       reservedSize: 30,
                       getTitlesWidget: (v, _) => Text(
                         v.toInt().toString(),
@@ -231,43 +287,44 @@ class _MobilityChart extends StatelessWidget {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: 1,
                       getTitlesWidget: (v, _) {
-                        final week = v.toInt() + 1;
-                        if (week % 2 == 0 || week == 1 || week == 12) {
-                          return Text('W$week', style: AppTextStyles.caption);
-                        }
-                        return const SizedBox.shrink();
+                        final i = v.toInt();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            i < _days.length ? _days[i] : '',
+                            style: AppTextStyles.caption,
+                          ),
+                        );
                       },
                     ),
                   ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                barGroups: List.generate(7, (i) {
+                  final reps = i < weeklyReps.length ? weeklyReps[i] : 0;
+                  return BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: reps.toDouble(),
+                        color: AppColors.sageGreen,
+                        width: 22,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                      ),
+                    ],
+                  );
+                }),
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => AppColors.espresso,
+                    getTooltipItem: (group, groupIdx, rod, rodIdx) => BarTooltipItem(
+                      '${rod.toY.toInt()}',
+                      AppTextStyles.caption.copyWith(color: Colors.white),
+                    ),
                   ),
                 ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: _spots,
-                    isCurved: true,
-                    color: AppColors.chartLine,
-                    barWidth: 2,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, pct, bar, idx) => FlDotCirclePainter(
-                        radius: 3,
-                        color: AppColors.chartLine,
-                        strokeWidth: 0,
-                      ),
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: AppColors.chartFill,
-                    ),
-                  ),
-                ],
               ),
             ),
           ),
@@ -289,9 +346,26 @@ class _MobilityChart extends StatelessWidget {
   }
 }
 
-class _RepStats extends StatelessWidget {
+class _RepStats extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final senior = ref.watch(selectedSeniorProvider);
+    if (senior == null) return const SizedBox.shrink();
+    final insights = ref.watch(seniorInsightsProvider(senior.id));
+
+    final weeklyReps = insights.weeklyReps;
+    // Sparkline from real daily rep counts.
+    final repSpots = List.generate(
+      weeklyReps.length,
+      (i) => FlSpot(i.toDouble(), weeklyReps[i].toDouble()),
+    );
+    // Consistency sparkline: 1.0 for active days, 0.0 for rest days.
+    final consistencySpots = List.generate(
+      weeklyReps.length,
+      (i) => FlSpot(i.toDouble(), weeklyReps[i] > 0 ? 1.0 : 0.0),
+    );
+    final fallbackSpots = [const FlSpot(0, 0), const FlSpot(1, 0)];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Row(
@@ -301,12 +375,10 @@ class _RepStats extends StatelessWidget {
               icon: Icons.speed_outlined,
               title: 'Speed',
               subtitle: 'Average Rep Time',
-              value: '${MockSessionData.avgRepTimeSeconds}',
+              value: insights.avgRepTimeSeconds.toStringAsFixed(1),
               unit: 'sec',
-              delta: '-8%',
-              deltaPositive: true,
-              deltaLabel: 'vs last 12 weeks',
-              trend: _TrendDirection.down,
+              label: 'per repetition this month',
+              spots: repSpots.length >= 2 ? repSpots : fallbackSpots,
             ),
           ),
           const SizedBox(width: 12),
@@ -315,12 +387,10 @@ class _RepStats extends StatelessWidget {
               icon: Icons.track_changes_outlined,
               title: 'Consistency',
               subtitle: 'Rep Completion Rate',
-              value: '${MockSessionData.consistencyPercent.toInt()}',
+              value: '${insights.consistencyPercent.toInt()}',
               unit: '%',
-              delta: '+6%',
-              deltaPositive: true,
-              deltaLabel: 'vs last 12 weeks',
-              trend: _TrendDirection.up,
+              label: '${insights.daysActiveThisMonth}/${insights.totalDaysThisMonth} days active',
+              spots: consistencySpots.length >= 2 ? consistencySpots : fallbackSpots,
             ),
           ),
         ],
@@ -329,18 +399,14 @@ class _RepStats extends StatelessWidget {
   }
 }
 
-enum _TrendDirection { up, down }
-
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final String value;
   final String unit;
-  final String delta;
-  final bool deltaPositive;
-  final String deltaLabel;
-  final _TrendDirection trend;
+  final String label;
+  final List<FlSpot> spots;
 
   const _StatCard({
     required this.icon,
@@ -348,25 +414,12 @@ class _StatCard extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.unit,
-    required this.delta,
-    required this.deltaPositive,
-    required this.deltaLabel,
-    required this.trend,
+    required this.label,
+    required this.spots,
   });
-
-  static final _upSpots = [
-    const FlSpot(0, 1), const FlSpot(1, 1.2), const FlSpot(2, 1.5),
-    const FlSpot(3, 1.8), const FlSpot(4, 2), const FlSpot(5, 2.4),
-  ];
-  static final _downSpots = [
-    const FlSpot(0, 3), const FlSpot(1, 2.8), const FlSpot(2, 2.5),
-    const FlSpot(3, 2.3), const FlSpot(4, 2.1), const FlSpot(5, 1.9),
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final spots = trend == _TrendDirection.up ? _upSpots : _downSpots;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -421,28 +474,8 @@ class _StatCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.lightSage.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  deltaPositive ? Icons.arrow_downward : Icons.arrow_upward,
-                  size: 10,
-                  color: AppColors.sageGreen,
-                ),
-                const SizedBox(width: 2),
-                Text(delta, style: AppTextStyles.caption.copyWith(color: AppColors.sageGreen, fontSize: 10)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(deltaLabel, style: AppTextStyles.caption),
+          const SizedBox(height: 4),
+          Text(label, style: AppTextStyles.caption),
           const SizedBox(height: 10),
           SizedBox(
             height: 32,

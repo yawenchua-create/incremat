@@ -2,35 +2,66 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/utils/auth_errors.dart';
 import '../../models/senior.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/hardware_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/senior_provider.dart';
+import '../auth/login_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final senior = ref.watch(selectedSeniorProvider) ?? MockSeniors.betty;
+    final senior = ref.watch(selectedSeniorProvider);
     final authState = ref.watch(authNotifierProvider);
+
+    ref.listen(authNotifierProvider, (_, next) {
+      if (next.hasError && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyAuthError(next.error))),
+        );
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(child: _SettingsHeader(senior: senior)),
-            SliverToBoxAdapter(child: _RepGoalCard(senior: senior)),
-            SliverToBoxAdapter(child: _MusicCard(senior: senior)),
-            SliverToBoxAdapter(child: _NotificationsCard(senior: senior)),
-            SliverToBoxAdapter(child: _AccountSection(
-              isSigningOut: authState.isLoading,
-              onSignOut: () async {
-                await ref.read(authNotifierProvider.notifier).signOut();
-              },
-            )),
+            SliverToBoxAdapter(child: const _SettingsHeader()),
+            SliverToBoxAdapter(child: _SettingsSeniorSwitcher()),
+            if (senior != null) ...[
+              SliverToBoxAdapter(child: _RepGoalCard(senior: senior)),
+              SliverToBoxAdapter(child: _MusicCard(senior: senior)),
+              SliverToBoxAdapter(child: _NotificationsCard(senior: senior)),
+            ],
+            SliverToBoxAdapter(
+              child: _AccountSection(
+                isAuthLoading: authState.isLoading,
+                onSignOut: () async {
+                  final nav = Navigator.of(context);
+                  await ref.read(authNotifierProvider.notifier).signOut();
+                  nav.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+                onDeleteAccount: (password) async {
+                  final nav = Navigator.of(context);
+                  await ref
+                      .read(authNotifierProvider.notifier)
+                      .deleteAccount(password: password);
+                  if (ref.read(authNotifierProvider).hasError) return;
+                  nav.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
@@ -39,9 +70,57 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
+class _SettingsSeniorSwitcher extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final seniors = ref.watch(seniorsProvider);
+    final selected = ref.watch(selectedSeniorProvider);
+
+    if (seniors.length <= 1) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        itemCount: seniors.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final senior = seniors[i];
+          final isSelected = senior.id == selected?.id;
+          return GestureDetector(
+            onTap: () => selectSenior(ref, senior.id),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.sageGreen : AppColors.cardSurface,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.espresso.withValues(alpha: 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                senior.name,
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: isSelected ? Colors.white : AppColors.espresso,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _SettingsHeader extends StatelessWidget {
-  final Senior senior;
-  const _SettingsHeader({required this.senior});
+  const _SettingsHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -53,17 +132,6 @@ class _SettingsHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Exercise Settings', style: AppTextStyles.headlineLarge),
-              const SizedBox(height: 4),
-              Text(
-                senior.name,
-                style: AppTextStyles.headlineSmall.copyWith(color: AppColors.sageGreen),
-              ),
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                width: 40,
-                height: 2,
-                color: AppColors.terracotta.withValues(alpha: 0.6),
-              ),
             ],
           ),
           Positioned(
@@ -77,7 +145,6 @@ class _SettingsHeader extends StatelessWidget {
   }
 }
 
-// Uses local state for the slider so Firestore stream ticks don't reset it.
 class _RepGoalCard extends ConsumerStatefulWidget {
   final Senior senior;
   const _RepGoalCard({required this.senior});
@@ -88,7 +155,7 @@ class _RepGoalCard extends ConsumerStatefulWidget {
 
 class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
   late int _goal;
-  late double _sliderValue; // clamped to slider range; decoupled from _goal
+  late double _sliderValue;
 
   @override
   void initState() {
@@ -169,9 +236,8 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
                 _goal = v.round();
               }),
               onChangeEnd: (v) {
-                final newGoal = v.round();
                 ref.read(seniorsNotifierProvider.notifier)
-                    .updateGoal(widget.senior.id, newGoal);
+                    .updateGoal(widget.senior.id, v.round());
               },
             ),
           ),
@@ -194,16 +260,15 @@ class _MusicCard extends ConsumerWidget {
   final Senior senior;
   const _MusicCard({required this.senior});
 
-  static const _tracks = ['甜蜜蜜', '半斤八两', 'Morning Zen', 'Afternoon Groove', 'Evening Calm'];
+  static const _tracks = ['甜蜜蜜', '半斤八两'];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedTrack = ref.watch(selectedTrackProvider(senior.id));
     final randomize = ref.watch(randomizeTracksProvider(senior.id));
 
-    // Sync explicit track selection to hardware whenever the user picks one.
     ref.listen(selectedTrackProvider(senior.id), (_, track) {
-      if (!ref.read(randomizeTracksProvider(senior.id))) {
+      if (track != null && !ref.read(randomizeTracksProvider(senior.id))) {
         ref.read(hardwareServiceProvider).sendMusicTrack(track);
       }
     });
@@ -252,48 +317,55 @@ class _MusicCard extends ConsumerWidget {
               children: _tracks.asMap().entries.map((entry) {
                 final track = entry.value;
                 final isLast = entry.key == _tracks.length - 1;
-                final isSelected = track == selectedTrack;
+                final isSelected = !randomize && track == selectedTrack;
                 return Column(
                   children: [
-                    InkWell(
-                      onTap: () => ref
-                          .read(selectedTrackProvider(senior.id).notifier)
-                          .state = track,
-                      borderRadius: BorderRadius.vertical(
-                        top: entry.key == 0 ? const Radius.circular(15) : Radius.zero,
-                        bottom: isLast ? const Radius.circular(15) : Radius.zero,
-                      ),
-                      child: Container(
-                        color: isSelected
-                            ? AppColors.lightSage.withValues(alpha: 0.3)
-                            : null,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.sageGreen
-                                    : AppColors.lightSage.withValues(alpha: 0.5),
-                                shape: BoxShape.circle,
+                    Opacity(
+                      opacity: randomize ? 0.45 : 1.0,
+                      child: InkWell(
+                        onTap: () {
+                          if (randomize) {
+                            ref.read(randomizeTracksProvider(senior.id).notifier).state = false;
+                          }
+                          ref.read(selectedTrackProvider(senior.id).notifier).state =
+                              isSelected ? null : track;
+                        },
+                        borderRadius: BorderRadius.vertical(
+                          top: entry.key == 0 ? const Radius.circular(15) : Radius.zero,
+                          bottom: isLast ? const Radius.circular(15) : Radius.zero,
+                        ),
+                        child: Container(
+                          color: isSelected
+                              ? AppColors.lightSage.withValues(alpha: 0.3)
+                              : null,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.sageGreen
+                                      : AppColors.lightSage.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.play_arrow,
+                                  size: 16,
+                                  color: isSelected ? Colors.white : AppColors.subtleText,
+                                ),
                               ),
-                              child: Icon(
-                                Icons.play_arrow,
-                                size: 16,
-                                color: isSelected ? Colors.white : AppColors.subtleText,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(track, style: AppTextStyles.bodyMedium),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(track, style: AppTextStyles.bodyMedium),
-                            ),
-                            if (isSelected)
-                              const Icon(Icons.check_circle, size: 18, color: AppColors.sageGreen)
-                            else
-                              const Icon(Icons.more_horiz, size: 18, color: AppColors.subtleText),
-                          ],
+                              if (isSelected)
+                                const Icon(Icons.check_circle, size: 18, color: AppColors.sageGreen)
+                              else
+                                const Icon(Icons.more_horiz, size: 18, color: AppColors.subtleText),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -328,9 +400,11 @@ class _MusicCard extends ConsumerWidget {
               ),
               Switch(
                 value: randomize,
-                onChanged: (v) => ref
-                    .read(randomizeTracksProvider(senior.id).notifier)
-                    .state = v,
+                onChanged: selectedTrack != null
+                    ? null
+                    : (v) => ref
+                        .read(randomizeTracksProvider(senior.id).notifier)
+                        .state = v,
                 activeThumbColor: AppColors.sageGreen,
                 activeTrackColor: AppColors.sageGreen.withValues(alpha: 0.4),
               ),
@@ -346,10 +420,19 @@ class _NotificationsCard extends ConsumerWidget {
   final Senior senior;
   const _NotificationsCard({required this.senior});
 
+  String _formatTime(TimeOfDay t) {
+    final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final minute = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notifAsync = ref.watch(notificationsProvider);
+    final notifAsync = ref.watch(notificationsProvider(senior.id));
     final enabled = notifAsync.valueOrNull ?? false;
+    final timeAsync = ref.watch(notificationTimeProvider);
+    final currentTime = timeAsync.valueOrNull ?? const TimeOfDay(hour: 20, minute: 0);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -393,7 +476,7 @@ class _NotificationsCard extends ConsumerWidget {
                     Text('Goal Reminder', style: AppTextStyles.titleMedium),
                     Text(
                       enabled
-                          ? 'Reminder set for 8:00 PM daily'
+                          ? 'Reminder set for ${_formatTime(currentTime)} daily'
                           : "Notify if daily rep goal isn't met",
                       style: AppTextStyles.caption,
                     ),
@@ -412,13 +495,60 @@ class _NotificationsCard extends ConsumerWidget {
                   : Switch(
                       value: enabled,
                       onChanged: (v) => ref
-                          .read(notificationsProvider.notifier)
+                          .read(notificationsProvider(senior.id).notifier)
                           .toggle(v, seniorName: senior.name, goalReps: senior.dailyRepGoal),
                       activeThumbColor: AppColors.sageGreen,
                       activeTrackColor: AppColors.sageGreen.withValues(alpha: 0.4),
                     ),
             ],
           ),
+          if (enabled) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: currentTime,
+                  builder: (context, child) => Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: const ColorScheme.light(
+                        primary: AppColors.sageGreen,
+                      ),
+                    ),
+                    child: child!,
+                  ),
+                );
+                if (picked != null) {
+                  ref.read(notificationTimeProvider.notifier).setTime(
+                    picked,
+                    seniorId: senior.id,
+                    seniorName: senior.name,
+                    goalReps: senior.dailyRepGoal,
+                  );
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule_outlined, size: 18, color: AppColors.sageGreen),
+                    const SizedBox(width: 10),
+                    Text('Reminder Time', style: AppTextStyles.titleMedium),
+                    const Spacer(),
+                    Text(
+                      _formatTime(currentTime),
+                      style: AppTextStyles.titleMedium.copyWith(color: AppColors.sageGreen),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right, size: 16, color: AppColors.subtleText),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -427,8 +557,14 @@ class _NotificationsCard extends ConsumerWidget {
 
 class _AccountSection extends StatelessWidget {
   final VoidCallback onSignOut;
-  final bool isSigningOut;
-  const _AccountSection({required this.onSignOut, required this.isSigningOut});
+  final void Function(String password) onDeleteAccount;
+  final bool isAuthLoading;
+
+  const _AccountSection({
+    required this.onSignOut,
+    required this.onDeleteAccount,
+    required this.isAuthLoading,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -455,10 +591,10 @@ class _AccountSection extends StatelessWidget {
           const Divider(height: 1, indent: 20, endIndent: 20),
           _SettingsTile(
             icon: Icons.logout,
-            label: isSigningOut ? 'Signing out…' : 'Sign Out',
+            label: isAuthLoading ? 'Signing out…' : 'Sign Out',
             labelColor: AppColors.terracotta,
             iconColor: AppColors.terracotta,
-            trailing: isSigningOut
+            trailing: isAuthLoading
                 ? const SizedBox(
                     width: 16,
                     height: 16,
@@ -468,7 +604,67 @@ class _AccountSection extends StatelessWidget {
                     ),
                   )
                 : null,
-            onTap: isSigningOut ? () {} : onSignOut,
+            onTap: isAuthLoading ? () {} : onSignOut,
+          ),
+          const Divider(height: 1, indent: 20, endIndent: 20),
+          _SettingsTile(
+            icon: Icons.delete_forever_outlined,
+            label: 'Delete Account',
+            labelColor: AppColors.terracotta,
+            iconColor: AppColors.terracotta,
+            onTap: isAuthLoading
+                ? () {}
+                : () async {
+                    final passwordCtrl = TextEditingController();
+                    final password = await showDialog<String?>(
+                      context: context,
+                      builder: (ctx) => StatefulBuilder(
+                        builder: (ctx, setDialogState) => AlertDialog(
+                          title: const Text('Delete Account?'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'This permanently removes your account and all care data. Enter your password to confirm.',
+                              ),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: passwordCtrl,
+                                obscureText: true,
+                                autofocus: true,
+                                decoration: const InputDecoration(
+                                  hintText: 'Password',
+                                  prefixIcon: Icon(Icons.lock_outline,
+                                      size: 18, color: AppColors.subtleText),
+                                ),
+                                onChanged: (_) => setDialogState(() {}),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, null),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: passwordCtrl.text.isEmpty
+                                  ? null
+                                  : () => Navigator.pop(ctx, passwordCtrl.text),
+                              child: const Text(
+                                'Delete',
+                                style: TextStyle(color: AppColors.terracotta),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                    passwordCtrl.dispose();
+                    if (password != null && password.isNotEmpty) {
+                      onDeleteAccount(password);
+                    }
+                  },
           ),
         ],
       ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
@@ -37,22 +39,23 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
+    // Capture navigator before the async gap to avoid stale context issues.
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(seniorsNotifierProvider.notifier).addSenior(
             name: _nameCtrl.text.trim(),
             age: int.parse(_ageCtrl.text.trim()),
             dailyRepGoal: int.parse(_goalCtrl.text.trim()),
-          );
-      if (mounted) Navigator.of(context).pop();
+          ).timeout(const Duration(seconds: 6));
+    } on TimeoutException {
+      // Firestore wrote locally and will sync when server is reachable — safe to proceed.
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e')),
-        );
-      }
-    } finally {
+      messenger.showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       if (mounted) setState(() => _isSaving = false);
+      return;
     }
+    nav.pop();
   }
 
   @override
@@ -146,8 +149,8 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Enter a goal';
                     final goal = int.tryParse(v);
-                    if (goal == null || goal < 5 || goal > 99) {
-                      return 'Enter a goal between 5 and 99';
+                    if (goal == null || goal < 5 || goal > 50) {
+                      return 'Enter a goal between 5 and 50';
                     }
                     return null;
                   },

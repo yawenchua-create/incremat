@@ -1,35 +1,42 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/senior.dart';
+import '../models/session_log.dart';
+import '../services/notifications/notification_service.dart';
 import '../services/seniors/senior_repository.dart';
+import '../services/seniors/session_repository.dart';
 import 'auth_provider.dart';
+import 'notification_provider.dart';
 
-// Repository scoped to the current user; null when logged out.
 final seniorRepositoryProvider = Provider<SeniorRepository?>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   return user != null ? SeniorRepository(user.uid) : null;
 });
 
+final sessionRepositoryProvider =
+    Provider.family<SessionRepository?, String>((ref, seniorId) {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  return user != null ? SessionRepository(user.uid, seniorId) : null;
+});
+
 // Firestore stream — returns real data when authenticated, mock when logged out.
-// An empty Firestore collection returns [] so HomeScreen can show an empty state.
 final seniorsStreamProvider = StreamProvider<List<Senior>>((ref) {
   final repo = ref.watch(seniorRepositoryProvider);
   if (repo == null) return Stream.value(List<Senior>.unmodifiable(MockSeniors.all));
   return repo.watchAll();
 });
 
-// Sync alias used by screens that don't need a loading spinner.
-// Falls back to mock (Betty) when the Firestore list is null or empty so that
-// Insights / Settings always have a senior to display during the demo.
+// Sync alias: mock data only for unauthenticated users (demo mode).
 final seniorsProvider = Provider<List<Senior>>((ref) {
+  final user = ref.watch(authStateProvider).valueOrNull;
   final list = ref.watch(seniorsStreamProvider).valueOrNull;
-  return (list == null || list.isEmpty) ? MockSeniors.all : list;
+  if (user == null) return MockSeniors.all;
+  return list ?? [];
 });
 
 // Holds the explicit senior ID selection; null = auto-select first.
 final _selectedSeniorIdProvider = StateProvider<String?>((ref) => null);
 
 // Derives the active Senior object from the selection + seniors list.
-// Falls back gracefully if the selected ID is no longer in the list.
 final selectedSeniorProvider = Provider<Senior?>((ref) {
   final seniors = ref.watch(seniorsProvider);
   if (seniors.isEmpty) return null;
@@ -45,9 +52,31 @@ void selectSenior(WidgetRef ref, String seniorId) {
   ref.read(_selectedSeniorIdProvider.notifier).state = seniorId;
 }
 
-// Music track selection per senior (keyed by senior id)
+// Recent sessions stream per senior.
+final recentSessionsProvider =
+    StreamProvider.family<List<SessionLog>, String>((ref, seniorId) {
+  final repo = ref.watch(sessionRepositoryProvider(seniorId));
+  if (repo == null) return Stream.value([]);
+  return repo.watchRecent();
+});
+
+// All sessions since the start of the current week or month (whichever is earlier).
+// Used by seniorInsightsProvider to compute real-time metrics.
+final monthlySessionsProvider =
+    StreamProvider.family<List<SessionLog>, String>((ref, seniorId) {
+  final repo = ref.watch(sessionRepositoryProvider(seniorId));
+  if (repo == null) return Stream.value([]);
+  final now = DateTime.now();
+  final startOfMonth = DateTime(now.year, now.month, 1);
+  final today = DateTime(now.year, now.month, now.day);
+  final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+  final since = startOfWeek.isBefore(startOfMonth) ? startOfWeek : startOfMonth;
+  return repo.watchSince(since);
+});
+
+// Music track selection per senior (keyed by senior id).
 final selectedTrackProvider =
-    StateProvider.family<String, String>((ref, _) => '甜蜜蜜');
+    StateProvider.family<String?, String>((ref, _) => null);
 
 final randomizeTracksProvider =
     StateProvider.family<bool, String>((ref, _) => true);
@@ -67,6 +96,16 @@ class SeniorsNotifier extends Notifier<void> {
     await repo.add(name: name, age: age, dailyRepGoal: dailyRepGoal);
   }
 
+  Future<void> updateSenior(
+    String seniorId, {
+    required String name,
+    required int age,
+  }) async {
+    final repo = ref.read(seniorRepositoryProvider);
+    if (repo == null) return;
+    await repo.update(seniorId, name: name, age: age);
+  }
+
   Future<void> updateGoal(String seniorId, int newGoal) async {
     final repo = ref.read(seniorRepositoryProvider);
     if (repo == null) return;
@@ -76,6 +115,12 @@ class SeniorsNotifier extends Notifier<void> {
   Future<void> deleteSenior(String seniorId) async {
     final repo = ref.read(seniorRepositoryProvider);
     if (repo == null) return;
+    // Cancel this senior's notification before removing them.
+    final enabled =
+        ref.read(notificationsProvider(seniorId)).valueOrNull ?? false;
+    if (enabled) {
+      await NotificationService().cancelGoalReminder(seniorId);
+    }
     await repo.delete(seniorId);
   }
 }

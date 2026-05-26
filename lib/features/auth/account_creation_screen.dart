@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/utils/auth_errors.dart';
 import '../../providers/auth_provider.dart';
+import '../seniors/add_loved_one_screen.dart';
+import '../shell/main_shell.dart';
 import 'login_screen.dart';
 
 class AccountCreationScreen extends ConsumerStatefulWidget {
@@ -27,12 +30,6 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
     super.dispose();
   }
 
-  String _parseError(Object? error) {
-    final raw = error.toString();
-    final idx = raw.lastIndexOf('] ');
-    return idx == -1 ? raw : raw.substring(idx + 2);
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     await ref.read(authNotifierProvider.notifier).createAccount(
@@ -49,7 +46,13 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
     ref.listen(authNotifierProvider, (_, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_parseError(next.error))),
+          SnackBar(content: Text(friendlyAuthError(next.error))),
+        );
+      } else if (!next.isLoading && next.value != null) {
+        // Navigate to MainShell; _PostSignupLauncher pushes AddLovedOneScreen on top.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const _PostSignupLauncher()),
+          (route) => false,
         );
       }
     });
@@ -278,4 +281,29 @@ class _InputField extends StatelessWidget {
       ),
     );
   }
+}
+
+// Renders MainShell and immediately pushes AddLovedOneScreen for onboarding.
+class _PostSignupLauncher extends StatefulWidget {
+  const _PostSignupLauncher();
+
+  @override
+  State<_PostSignupLauncher> createState() => _PostSignupLauncherState();
+}
+
+class _PostSignupLauncherState extends State<_PostSignupLauncher> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AddLovedOneScreen()),
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const MainShell();
 }

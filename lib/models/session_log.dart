@@ -40,7 +40,7 @@ class MockSessionData {
     57, 59, 62, 64, 65, 66, 74, 75, 76, 80, 83, 89,
   ];
 
-  static const List<int> weeklyReps = [194, 215, 248, 287, 304];
+  static const List<int> weeklyReps = [14, 12, 0, 16, 10, 14, 0];
 
   static const int todayReps = 8;
   static const double avgRepTimeSeconds = 2.6;

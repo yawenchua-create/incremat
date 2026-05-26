@@ -10,6 +10,8 @@ class MockHardwareService implements HardwareService {
   );
 
   final _controller = StreamController<HardwareStatus>.broadcast();
+  final _repController = StreamController<int>.broadcast();
+  final _speedController = StreamController<double>.broadcast();
   HardwareStatus _current = _connectedStatus;
 
   MockHardwareService() {
@@ -24,6 +26,12 @@ class MockHardwareService implements HardwareService {
 
   @override
   Stream<HardwareStatus> get statusStream => _controller.stream;
+
+  @override
+  Stream<int> get repCountStream => _repController.stream;
+
+  @override
+  Stream<double> get avgRepTimeStream => _speedController.stream;
 
   @override
   HardwareStatus get currentStatus => _current;
@@ -49,5 +57,7 @@ class MockHardwareService implements HardwareService {
   @override
   void dispose() {
     _controller.close();
+    _repController.close();
+    _speedController.close();
   }
 }

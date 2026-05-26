@@ -24,11 +24,21 @@ dependencies:
   intl: ^0.19.0
   flutter_local_notifications: ^17.2.0
   timezone: ^0.9.4
+  flutter_timezone: 5.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+dependency_overrides:
+  # path_provider_foundation >=2.4.0 added an objective_c native-asset build
+  # hook that fails when the Flutter SDK path contains spaces (Windows bug).
+  # Pin to the last version without that hook until the Flutter path is fixed.
+  path_provider_foundation: '>=2.0.0 <2.4.0'
+
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/sit_to_stand.png
+    - assets/images/chair_mat.png

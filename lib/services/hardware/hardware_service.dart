@@ -26,6 +26,10 @@ class HardwareStatus {
 
 abstract class HardwareService {
   Stream<HardwareStatus> get statusStream;
+  // Emits cumulative rep count for the current session each time a rep is detected.
+  Stream<int> get repCountStream;
+  // Emits avg rep time (seconds) updated after each rep.
+  Stream<double> get avgRepTimeStream;
   HardwareStatus get currentStatus;
   Future<void> connect(String deviceId);
   Future<void> disconnect();

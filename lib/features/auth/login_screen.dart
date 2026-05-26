@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/utils/auth_errors.dart';
 import '../../providers/auth_provider.dart';
+import '../shell/main_shell.dart';
 import 'account_creation_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -52,16 +54,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Could not send reset email.')),
+          SnackBar(content: Text(friendlyAuthError(e))),
         );
       }
     }
-  }
-
-  String _parseError(Object? error) {
-    final raw = error.toString();
-    final idx = raw.lastIndexOf('] ');
-    return idx == -1 ? raw : raw.substring(idx + 2);
   }
 
   @override
@@ -71,7 +67,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen(authNotifierProvider, (_, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_parseError(next.error))),
+          SnackBar(content: Text(friendlyAuthError(next.error))),
+        );
+      } else if (!next.isLoading && next.value != null) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainShell()),
+          (route) => false,
         );
       }
     });

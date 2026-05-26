@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../models/senior.dart';
-import '../../models/session_log.dart';
+import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../seniors/add_loved_one_screen.dart';
 import 'senior_detail_screen.dart';
@@ -29,7 +29,13 @@ class HomeScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(child: _Header(onAddPerson: onAddPerson)),
-              SliverToBoxAdapter(child: _SitToStandIllustration()),
+              SliverToBoxAdapter(
+                child: Image.asset(
+                  'assets/images/sit_to_stand.png',
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                ),
+              ),
               seniorsAsync.when(
                 loading: () => const SliverToBoxAdapter(
                   child: Padding(
@@ -106,7 +112,7 @@ class HomeScreen extends ConsumerWidget {
                                 senior: senior,
                                 onTap: () => Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => SeniorDetailScreen(senior: senior),
+                                    builder: (_) => SeniorDetailScreen(seniorId: senior.id),
                                   ),
                                 ),
                               ),
@@ -246,141 +252,30 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _SitToStandIllustration extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 220,
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            bottom: 16,
-            left: 40,
-            child: _ChairWithMat(),
-          ),
-          Positioned(
-            bottom: 60,
-            left: 120,
-            child: _PersonSilhouette(),
-          ),
-          Positioned(
-            bottom: 80,
-            left: 100,
-            child: Icon(
-              Icons.arrow_upward,
-              color: AppColors.sageGreen.withValues(alpha: 0.7),
-              size: 28,
-            ),
-          ),
-          Positioned(
-            top: 10,
-            left: 20,
-            child: Icon(Icons.eco, color: AppColors.lightSage, size: 32),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _ChairWithMat extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          children: [
-            Container(
-              width: 80,
-              height: 12,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD4C8B8),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            Positioned(
-              top: 1,
-              left: 8,
-              child: Container(
-                width: 64,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: AppColors.espresso.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-          ],
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ChairLeg(),
-            const SizedBox(width: 60),
-            _ChairLeg(),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ChairLeg extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 6,
-      height: 40,
-      decoration: BoxDecoration(
-        color: const Color(0xFFD4C8B8),
-        borderRadius: BorderRadius.circular(3),
-      ),
-    );
-  }
-}
-
-class _PersonSilhouette extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: AppColors.mutedSage.withValues(alpha: 0.5),
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: 32,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.mutedSage.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SeniorCard extends StatelessWidget {
+class _SeniorCard extends ConsumerWidget {
   final Senior senior;
   final VoidCallback onTap;
 
   const _SeniorCard({required this.senior, required this.onTap});
 
+  String _freshnessLabel(DateTime? date) {
+    if (date == null) return 'No sessions yet';
+    final now = DateTime.now();
+    final diff = now.difference(date).inDays;
+    if (diff == 0) return 'Last session: Today';
+    if (diff == 1) return 'Last session: Yesterday';
+    return 'Last session: ${diff}d ago';
+  }
+
   @override
-  Widget build(BuildContext context) {
-    final todayReps = MockSessionData.todayReps;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final insights = ref.watch(seniorInsightsProvider(senior.id));
+    final todayReps = insights.todayReps;
     final goalReps = senior.dailyRepGoal;
     final progress = (todayReps / goalReps).clamp(0.0, 1.0);
+    final repDiff = todayReps - insights.yesterdayReps;
+    final repDiffSign = repDiff >= 0 ? '+' : '';
 
     return GestureDetector(
       onTap: onTap,
@@ -410,7 +305,10 @@ class _SeniorCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(senior.name, style: AppTextStyles.headlineSmall),
-                        Text('Sit-to-Stand Progress', style: AppTextStyles.bodySmall),
+                        Text(
+                          _freshnessLabel(insights.lastSessionDate),
+                          style: AppTextStyles.caption,
+                        ),
                       ],
                     ),
                   ),
@@ -454,22 +352,21 @@ class _SeniorCard extends StatelessWidget {
                     child: Column(
                       children: [
                         _StatRow(
-                          icon: Icons.trending_up,
-                          label: 'Improvement',
-                          value: '+2 from yesterday',
+                          icon: repDiff >= 0 ? Icons.trending_up : Icons.trending_down,
+                          label: 'vs. yesterday',
+                          value: '$repDiffSign$repDiff reps',
                         ),
                         const SizedBox(height: 12),
                         _StatRow(
                           icon: Icons.timer_outlined,
                           label: 'Avg. Time',
-                          value: '${MockSessionData.avgRepTimeSeconds}s',
+                          value: '${insights.avgRepTimeSeconds.toStringAsFixed(1)}s',
                         ),
                         const SizedBox(height: 12),
                         _StatRow(
                           icon: Icons.bar_chart_outlined,
                           label: 'This Week',
-                          value:
-                              '${MockSessionData.daysActiveThisWeek} of ${MockSessionData.daysInWeek} days',
+                          value: '${insights.daysActiveThisWeek} of ${insights.daysInWeek} days',
                         ),
                       ],
                     ),
