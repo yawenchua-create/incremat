@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../providers/senior_provider.dart';
+import 'senior_added_screen.dart';
 
 class AddLovedOneScreen extends ConsumerStatefulWidget {
   const AddLovedOneScreen({super.key});
@@ -39,23 +40,31 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
-    // Capture navigator before the async gap to avoid stale context issues.
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final name = _nameCtrl.text.trim();
+    String? joinCode;
     try {
-      await ref.read(seniorsNotifierProvider.notifier).addSenior(
-            name: _nameCtrl.text.trim(),
+      joinCode = await ref.read(seniorsNotifierProvider.notifier).addSenior(
+            name: name,
             age: int.parse(_ageCtrl.text.trim()),
             dailyRepGoal: int.parse(_goalCtrl.text.trim()),
-          ).timeout(const Duration(seconds: 6));
+          );
     } on TimeoutException {
-      // Firestore wrote locally and will sync when server is reachable — safe to proceed.
+      // Firestore wrote locally; safe to proceed.
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       if (mounted) setState(() => _isSaving = false);
       return;
     }
-    nav.pop();
+    nav.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => SeniorAddedScreen(
+          seniorName: name,
+          joinCode: joinCode ?? '—',
+        ),
+      ),
+    );
   }
 
   @override

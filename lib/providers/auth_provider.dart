@@ -58,23 +58,25 @@ class AuthNotifier extends AsyncNotifier<User?> {
         password: password,
       );
       await user.reauthenticateWithCredential(cred);
-      // Best-effort Firestore cleanup — don't block account deletion if it times out.
+      // Best-effort Firestore cleanup — remove caregiver subcollection entries.
       try {
-        final seniorsRef = FirebaseFirestore.instance
-            .collection('users')
+        final accessDoc = await FirebaseFirestore.instance
+            .collection('caregiver_access')
             .doc(user.uid)
-            .collection('seniors');
-        final snap = await seniorsRef.get().timeout(const Duration(seconds: 8));
-        for (final doc in snap.docs) {
-          final sessionsSnap = await doc.reference
-              .collection('sessions')
-              .get()
-              .timeout(const Duration(seconds: 8));
-          for (final sessionDoc in sessionsSnap.docs) {
-            await sessionDoc.reference.delete();
-          }
-          await doc.reference.delete();
+            .get()
+            .timeout(const Duration(seconds: 8));
+        final seniorIds = List<String>.from(
+          accessDoc.data()?['seniorIds'] ?? [],
+        );
+        for (final seniorId in seniorIds) {
+          await FirebaseFirestore.instance
+              .collection('seniors')
+              .doc(seniorId)
+              .collection('caregivers')
+              .doc(user.uid)
+              .delete();
         }
+        await accessDoc.reference.delete();
       } catch (_) {
         // Cleanup timed out or failed; proceed with account deletion anyway.
       }

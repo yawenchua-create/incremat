@@ -35,6 +35,7 @@ class SettingsScreen extends ConsumerWidget {
             SliverToBoxAdapter(child: _SettingsSeniorSwitcher()),
             if (senior != null) ...[
               SliverToBoxAdapter(child: _RepGoalCard(senior: senior)),
+              SliverToBoxAdapter(child: _WeeklyRewardDaysCard(senior: senior)),
               SliverToBoxAdapter(child: _MusicCard(senior: senior)),
               SliverToBoxAdapter(child: _NotificationsCard(senior: senior)),
             ],
@@ -167,9 +168,10 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
   @override
   void didUpdateWidget(_RepGoalCard old) {
     super.didUpdateWidget(old);
-    if (old.senior.id != widget.senior.id) {
-      _goal = widget.senior.dailyRepGoal;
-      _sliderValue = _goal.clamp(5, 50).toDouble();
+    final incoming = widget.senior.dailyRepGoal;
+    if (_goal != incoming) {
+      _goal = incoming;
+      _sliderValue = incoming.clamp(5, 50).toDouble();
     }
   }
 
@@ -235,9 +237,17 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
                 _sliderValue = v;
                 _goal = v.round();
               }),
-              onChangeEnd: (v) {
-                ref.read(seniorsNotifierProvider.notifier)
-                    .updateGoal(widget.senior.id, v.round());
+              onChangeEnd: (v) async {
+                final messenger = ScaffoldMessenger.of(context);
+                try {
+                  await ref.read(seniorsNotifierProvider.notifier)
+                      .updateGoal(widget.senior.id, v.round());
+                } catch (_) {
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Could not save goal. Please try again.')),
+                  );
+                }
               },
             ),
           ),
@@ -249,6 +259,122 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
                   .map((v) => Text('$v', style: AppTextStyles.caption))
                   .toList(),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyRewardDaysCard extends ConsumerStatefulWidget {
+  final Senior senior;
+  const _WeeklyRewardDaysCard({required this.senior});
+
+  @override
+  ConsumerState<_WeeklyRewardDaysCard> createState() => _WeeklyRewardDaysCardState();
+}
+
+class _WeeklyRewardDaysCardState extends ConsumerState<_WeeklyRewardDaysCard> {
+  late int _threshold;
+
+  @override
+  void initState() {
+    super.initState();
+    _threshold = widget.senior.consistencyThreshold;
+  }
+
+  @override
+  void didUpdateWidget(_WeeklyRewardDaysCard old) {
+    super.didUpdateWidget(old);
+    final incoming = widget.senior.consistencyThreshold;
+    if (_threshold != incoming) {
+      _threshold = incoming;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.lightSage.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.calendar_today_outlined,
+                    size: 18, color: AppColors.sageGreen),
+              ),
+              const SizedBox(width: 12),
+              Text('Weekly Reward Days', style: AppTextStyles.titleLarge),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (i) {
+              final value = i + 1;
+              final selected = value == _threshold;
+              return GestureDetector(
+                onTap: () async {
+                  setState(() => _threshold = value);
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    await ref
+                        .read(seniorsNotifierProvider.notifier)
+                        .updateConsistencyThreshold(widget.senior.id, value);
+                  } catch (_) {
+                    if (!mounted) return;
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Could not save. Please try again.')),
+                    );
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.sageGreen : AppColors.warmCream,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected ? AppColors.sageGreen : AppColors.divider,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$value',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: selected ? Colors.white : AppColors.subtleText,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '${widget.senior.name} earns an egg in IncreMat Play when the daily goal of $_threshold ${_threshold == 1 ? 'day' : 'days'} a week is met.',
+            style: AppTextStyles.caption,
           ),
         ],
       ),

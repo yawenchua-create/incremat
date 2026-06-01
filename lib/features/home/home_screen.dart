@@ -6,6 +6,7 @@ import '../../models/senior.dart';
 import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../seniors/add_loved_one_screen.dart';
+import '../seniors/connect_senior_screen.dart';
 import 'senior_detail_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -17,6 +18,10 @@ class HomeScreen extends ConsumerWidget {
 
     void onAddPerson() => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AddLovedOneScreen()),
+        );
+
+    void onConnectSenior() => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ConnectSeniorScreen()),
         );
 
     return Scaffold(
@@ -54,11 +59,14 @@ class HomeScreen extends ConsumerWidget {
                 data: (seniors) {
                   if (seniors.isEmpty) {
                     return SliverToBoxAdapter(
-                      child: _EmptyState(onAddPerson: onAddPerson),
+                      child: _EmptyState(
+                        onAddPerson: onAddPerson,
+                        onConnectSenior: onConnectSenior,
+                      ),
                     );
                   }
                   return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, i) {
@@ -125,6 +133,25 @@ class HomeScreen extends ConsumerWidget {
                   );
                 },
               ),
+              if (seniorsAsync.valueOrNull?.isNotEmpty == true)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                    child: OutlinedButton.icon(
+                      onPressed: onConnectSenior,
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('Add Existing Senior'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        side: BorderSide(color: AppColors.sageGreen.withValues(alpha: 0.5)),
+                        foregroundColor: AppColors.sageGreen,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -135,7 +162,8 @@ class HomeScreen extends ConsumerWidget {
 
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAddPerson;
-  const _EmptyState({required this.onAddPerson});
+  final VoidCallback onConnectSenior;
+  const _EmptyState({required this.onAddPerson, required this.onConnectSenior});
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +204,20 @@ class _EmptyState extends StatelessWidget {
                   onPressed: onAddPerson,
                   icon: const Icon(Icons.add, size: 18),
                   label: Text('Add a Loved One', style: AppTextStyles.buttonText),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onConnectSenior,
+                  icon: const Icon(Icons.link, size: 18),
+                  label: const Text('Add Existing Senior'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    side: BorderSide(color: AppColors.sageGreen.withValues(alpha: 0.5)),
+                    foregroundColor: AppColors.sageGreen,
+                  ),
                 ),
               ],
             ),

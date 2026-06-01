@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -81,6 +82,8 @@ class SeniorDetailScreen extends ConsumerWidget {
               ),
             ),
             SliverToBoxAdapter(child: _SessionsList(seniorId: senior.id)),
+            if (senior.joinCode != null)
+              SliverToBoxAdapter(child: _PlayCodeCard(senior: senior)),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
@@ -445,10 +448,11 @@ class _SessionsList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(recentSessionsProvider(seniorId));
     final liveSession = ref.watch(liveSessionProvider);
-    final pendingSession =
-        (liveSession?.seniorId == seniorId && liveSession!.repCount > 0)
-            ? liveSession
-            : null;
+    final pendingSession = (liveSession != null &&
+            liveSession.seniorId == seniorId &&
+            liveSession.repCount > 0)
+        ? liveSession
+        : null;
 
     return sessionsAsync.when(
       loading: () => const Padding(
@@ -501,6 +505,63 @@ class _SessionsList extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _PlayCodeCard extends StatelessWidget {
+  final Senior senior;
+  const _PlayCodeCard({required this.senior});
+
+  @override
+  Widget build(BuildContext context) {
+    final code = senior.joinCode!;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.key_outlined, size: 18, color: AppColors.sageGreen),
+          const SizedBox(width: 10),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: AppTextStyles.bodySmall,
+                children: [
+                  TextSpan(text: "${senior.name}'s Play Code: "),
+                  TextSpan(
+                    text: code,
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.sageGreen,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: code));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Code copied to clipboard')),
+              );
+            },
+            child: const Icon(Icons.copy_outlined, size: 18, color: AppColors.subtleText),
+          ),
+        ],
+      ),
     );
   }
 }

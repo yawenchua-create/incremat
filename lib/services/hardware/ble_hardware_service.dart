@@ -170,6 +170,16 @@ class BleHardwareService implements HardwareService {
   @override
   Future<void> disconnect() async {
     _rssiTimer?.cancel();
+    _connectionSub?.cancel();
+    _batterySub?.cancel();
+    _matPlacedSub?.cancel();
+    _repCountSub?.cancel();
+    _repSpeedSub?.cancel();
+    _connectionSub = null;
+    _batterySub = null;
+    _matPlacedSub = null;
+    _repCountSub = null;
+    _repSpeedSub = null;
     await _device?.disconnect();
     _musicChar = null;
     _current = HardwareStatus.disconnected;

@@ -149,7 +149,9 @@ final seniorInsightsProvider =
     totalRepsThisMonth: totalRepsThisMonth,
     daysActiveThisMonth: daysActiveThisMonth,
     totalDaysThisMonth: totalDaysThisMonth,
-    weeklyReps: weeklyReps,
+    // Use effectiveWeeklyReps (includes live session) so the week calendar
+    // lights up today's dot while a session is in progress.
+    weeklyReps: effectiveWeeklyReps,
     lastSessionDate: lastSessionDate,
   );
 });
