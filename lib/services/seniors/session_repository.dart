@@ -9,6 +9,34 @@ class SessionRepository {
   CollectionReference<Map<String, dynamic>> get _col =>
       FirebaseFirestore.instance.collection('seniors/$_seniorId/sessions');
 
+  // Single doc mirroring the in-progress session so the play app can show
+  // live reps in real time: seniors/{id}/live/current
+  DocumentReference<Map<String, dynamic>> get _liveDoc =>
+      FirebaseFirestore.instance.doc('seniors/$_seniorId/live/current');
+
+  /// Publishes the current in-progress rep count for live display.
+  Future<void> updateLive({
+    required int repCount,
+    required double avgRepTimeSeconds,
+    required DateTime startedAt,
+  }) async {
+    await _liveDoc.set({
+      'active': true,
+      'repCount': repCount,
+      'avgRepTimeSeconds': avgRepTimeSeconds,
+      'startedAt': startedAt.millisecondsSinceEpoch,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Marks the live session inactive (session ended / flushed).
+  Future<void> clearLive() async {
+    await _liveDoc.set({
+      'active': false,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    }, SetOptions(merge: true));
+  }
+
   Future<void> add({
     required int repCount,
     required double avgRepTimeSeconds,

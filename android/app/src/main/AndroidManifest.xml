@@ -10,6 +10,10 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- NFC for tag programming and user identification -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
     <!-- Internet for Firebase and Google Fonts -->
     <uses-permission android:name="android.permission.INTERNET" />
 

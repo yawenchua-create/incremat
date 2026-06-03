@@ -9,6 +9,7 @@ import '../../providers/insights_provider.dart';
 import '../../providers/live_session_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../seniors/edit_senior_sheet.dart';
+import '../seniors/nfc_write_sheet.dart';
 
 class SeniorDetailScreen extends ConsumerWidget {
   final String seniorId;
@@ -364,9 +365,10 @@ class _MonthlySummary extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final insights = ref.watch(seniorInsightsProvider(seniorId));
-    final consistencyPct = insights.totalDaysThisMonth > 0
-        ? (insights.daysActiveThisMonth / insights.totalDaysThisMonth * 100).round()
-        : 0;
+    // Use the same consistency metric as the Insights/stats page (active days
+    // ÷ days elapsed since the first active day this week) so the two screens
+    // never disagree.
+    final consistencyPct = insights.consistencyPercent.round();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
@@ -530,35 +532,63 @@ class _PlayCodeCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.key_outlined, size: 18, color: AppColors.sageGreen),
-          const SizedBox(width: 10),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: AppTextStyles.bodySmall,
-                children: [
-                  TextSpan(text: "${senior.name}'s Play Code: "),
-                  TextSpan(
-                    text: code,
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.sageGreen,
-                      letterSpacing: 1.5,
-                    ),
+          Row(
+            children: [
+              const Icon(Icons.key_outlined, size: 18, color: AppColors.sageGreen),
+              const SizedBox(width: 10),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: AppTextStyles.bodySmall,
+                    children: [
+                      TextSpan(text: "${senior.name}'s Play Code: "),
+                      TextSpan(
+                        text: code,
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: AppColors.sageGreen,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+              GestureDetector(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: code));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Code copied to clipboard')),
+                  );
+                },
+                child: const Icon(Icons.copy_outlined,
+                    size: 18, color: AppColors.subtleText),
+              ),
+            ],
           ),
-          GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: code));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Code copied to clipboard')),
-              );
-            },
-            child: const Icon(Icons.copy_outlined, size: 18, color: AppColors.subtleText),
+          const SizedBox(height: 14),
+          // Enrol or re-enrol a card for this senior at any time.
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => NfcWriteSheet.show(
+                context,
+                seniorId: senior.id,
+                seniorName: senior.name,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.sageGreen,
+                side: BorderSide(
+                    color: AppColors.sageGreen.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.nfc, size: 18),
+              label: const Text('Enrol NFC Card'),
+            ),
           ),
         ],
       ),

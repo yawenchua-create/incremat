@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "796972289854",
+    "firebase_url": "https://incremat-caregiver-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "incremat-caregiver",
     "storage_bucket": "incremat-caregiver.firebasestorage.app"
   },
@@ -29,6 +30,25 @@
         "mobilesdk_app_id": "1:796972289854:android:42be6770b3df66889e666f",
         "android_client_info": {
           "package_name": "com.yakanaya.incremat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACC8GGZT6hEeVHzyVSbXXtoarZWtvpBFk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:796972289854:android:5ab272341d954e339e666f",
+        "android_client_info": {
+          "package_name": "com.yakanaya.incrematplay"
         }
       },
       "oauth_client": [],

@@ -34,8 +34,6 @@ class SessionMusicScreen extends ConsumerWidget {
                 layer: layer,
                 state: s,
               ),
-            const SizedBox(height: 14),
-            _ChunkProgressCard(state: s),
           ],
         ),
       ),
@@ -57,9 +55,16 @@ class _Header extends StatelessWidget {
             children: [
               Text('Session Music', style: AppTextStyles.headlineLarge),
               const SizedBox(height: 6),
-              Text(
-                'A track for exercise sessions — it layers up softly as you move.',
-                style: AppTextStyles.bodySmall,
+              Consumer(
+                builder: (context, ref, _) {
+                  final song = ref.watch(
+                      sessionMusicProvider.select((s) => s.songName));
+                  return Text(
+                    'Now loaded: $song — layers up live as your loved one '
+                    'exercises, driven by the mat\'s rep count.',
+                    style: AppTextStyles.bodySmall,
+                  );
+                },
               ),
             ],
           ),
@@ -73,7 +78,7 @@ class _Header extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF78695A).withOpacity(0.10),
+                color: const Color(0xFF78695A).withValues(alpha: 0.10),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -99,22 +104,22 @@ class _NowPlayingCard extends ConsumerWidget {
   }
 
   String get _title {
-    if (state.ended) return 'Well done';
-    if (!state.started) return 'Ready when you are';
-    return 'Layer ${state.layer} · Chunk ${state.chunk}';
+    if (state.ended) return 'Session complete';
+    if (!state.started) return 'Ready when the session starts';
+    return 'Layer ${state.layer} · ${kLayerNames[state.layer - 1]}';
   }
 
   String get _subtitle {
     if (state.assetMissing) {
-      return 'Audio files not added yet — drop them in assets/audio/';
+      return 'Stem files not found — add them under assets/audio/stems/';
     }
     if (state.ended) {
-      return '${state.reps} reps · all 20 chunks played';
+      return 'Session ended · ${state.reps} reps';
     }
     if (!state.started) {
-      return 'Music begins automatically on your first rep';
+      return 'Music begins automatically on the first rep detected';
     }
-    return '${state.reps} reps · stems layering live';
+    return '${state.layer} of $kLayerCount stems playing · ${state.reps} reps';
   }
 
   @override
@@ -129,7 +134,7 @@ class _NowPlayingCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF78695A).withOpacity(0.10),
+            color: const Color(0xFF78695A).withValues(alpha: 0.10),
             blurRadius: 30,
             offset: const Offset(0, 10),
           ),
@@ -156,7 +161,7 @@ class _NowPlayingCard extends ConsumerWidget {
           const SizedBox(height: 18),
           _StatRow(state: state),
           const SizedBox(height: 18),
-          _SeekBar(progress: state.chunkProgress),
+          _SeekBar(progress: state.trackProgress),
           const SizedBox(height: 9),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -191,12 +196,14 @@ class _StatRow extends StatelessWidget {
         _Stat(label: 'Reps', value: '${state.reps}'),
         _divider(),
         _Stat(
-            label: 'Layer',
+            label: 'Layers',
             value: state.started ? '${state.layer}/$kLayerCount' : '—'),
         _divider(),
         _Stat(
-            label: 'Chunk',
-            value: state.started ? '${state.chunk}/$kMaxChunks' : '—'),
+            label: 'Next Layer',
+            value: state.started && state.layer < kLayerCount
+                ? 'rep ${state.layer * state.repsPerLayer}'
+                : (state.started ? 'full' : '—')),
       ],
     );
   }
@@ -271,7 +278,7 @@ class _SeekBar extends StatelessWidget {
                     border: Border.all(color: Colors.white, width: 3),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF62765C).withOpacity(0.4),
+                        color: const Color(0xFF62765C).withValues(alpha: 0.4),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -373,7 +380,7 @@ class _PlayButton extends StatelessWidget {
           boxShadow: enabled
               ? [
                   BoxShadow(
-                    color: const Color(0xFF7C8F75).withOpacity(0.45),
+                    color: const Color(0xFF7C8F75).withValues(alpha: 0.45),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -410,22 +417,6 @@ class _LayersHeader extends StatelessWidget {
   }
 }
 
-const List<String> _layerNames = [
-  'Foundation',
-  'Warmth',
-  'Bloom',
-  'Flourish',
-  'Crescendo',
-];
-
-const List<String> _layerHints = [
-  'Soft piano base',
-  'Strings join in',
-  'Gentle percussion',
-  'Full arrangement',
-  'Everything together',
-];
-
 class _LayerRow extends StatelessWidget {
   const _LayerRow({required this.layer, required this.state});
 
@@ -452,7 +443,7 @@ class _LayerRow extends StatelessWidget {
             ? null
             : [
                 BoxShadow(
-                  color: const Color(0xFF78695A).withOpacity(0.06),
+                  color: const Color(0xFF78695A).withValues(alpha: 0.06),
                   blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
@@ -487,11 +478,11 @@ class _LayerRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Layer $layer · ${_layerNames[layer - 1]}',
+                  'Layer $layer · ${kLayerNames[layer - 1]}',
                   style: AppTextStyles.titleMedium,
                 ),
                 const SizedBox(height: 1),
-                Text(_layerHints[layer - 1], style: AppTextStyles.bodySmall),
+                Text(kLayerHints[layer - 1], style: AppTextStyles.bodySmall),
               ],
             ),
           ),
@@ -501,7 +492,7 @@ class _LayerRow extends StatelessWidget {
                 ? (state.isPlaying ? 'Playing' : 'Paused')
                 : unlocked
                     ? 'Unlocked'
-                    : 'Rep ${layer == 1 ? 1 : (layer - 1) * kRepsPerLayer}',
+                    : 'Rep ${layer == 1 ? 1 : (layer - 1) * state.repsPerLayer}',
             style: AppTextStyles.caption.copyWith(
               color: isCurrent ? AppColors.positiveGreen : AppColors.subtleText,
               fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
@@ -513,63 +504,6 @@ class _LayerRow extends StatelessWidget {
   }
 }
 
-class _ChunkProgressCard extends StatelessWidget {
-  const _ChunkProgressCard({required this.state});
-
-  final SessionMusicState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final reached = state.started ? state.chunk : 0;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-      decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF78695A).withOpacity(0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Chunk Progress', style: AppTextStyles.titleMedium),
-              Text('$reached / $kMaxChunks', style: AppTextStyles.bodySmall),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              for (int i = 1; i <= kMaxChunks; i++) ...[
-                Expanded(
-                  child: Container(
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: i < reached
-                          ? AppColors.sageGreen
-                          : i == reached
-                              ? AppColors.positiveGreen
-                              : AppColors.divider,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                ),
-                if (i != kMaxChunks) const SizedBox(width: 3),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Three little bars that bounce while audio is playing — the design's signature
 /// "now playing" motif.

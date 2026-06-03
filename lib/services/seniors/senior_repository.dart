@@ -91,8 +91,8 @@ class SeniorRepository {
   }
 
   /// Creates a new senior, writes the caregiver subcollection entry, generates a join code,
-  /// and returns the generated join code string.
-  Future<String> add({
+  /// and returns the seniorId + join code.
+  Future<({String seniorId, String joinCode})> add({
     required String name,
     required int age,
     required int dailyRepGoal,
@@ -132,7 +132,7 @@ class SeniorRepository {
       'seniorIds': FieldValue.arrayUnion([seniorId]),
     }, SetOptions(merge: true));
 
-    return joinCode;
+    return (seniorId: seniorId, joinCode: joinCode);
   }
 
   Future<void> updateGoal(String seniorId, int newGoal) async {

@@ -4,7 +4,10 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../providers/hardware_provider.dart';
 import '../../providers/live_session_provider.dart';
+import '../../providers/senior_provider.dart';
 import '../../services/hardware/hardware_service.dart';
+import '../../services/nfc/nfc_service.dart';
+import '../../services/nfc/nfc_uid_service.dart';
 
 class HardwareScreen extends ConsumerWidget {
   const HardwareScreen({super.key});
@@ -29,6 +32,8 @@ class HardwareScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: _LiveSessionCard(liveSession: liveSession),
               ),
+            // NFC tap-to-identify so sessions are credited to the right user.
+            SliverToBoxAdapter(child: _NfcIdentifyCard()),
             const SliverToBoxAdapter(
               child: _ChairIllustration(),
             ),
@@ -322,6 +327,150 @@ class _ConnectButton extends ConsumerWidget {
     } finally {
       ref.read(hardwareConnectingProvider.notifier).state = false;
     }
+  }
+}
+
+// ── NFC Identify Card ─────────────────────────────────────────────────────────
+
+class _NfcIdentifyCard extends ConsumerStatefulWidget {
+  const _NfcIdentifyCard();
+
+  @override
+  ConsumerState<_NfcIdentifyCard> createState() => _NfcIdentifyCardState();
+}
+
+class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
+  bool _scanning = false;
+  String? _statusMsg;
+  bool _isError = false;
+
+  Future<void> _identify() async {
+    final available = await NfcService.isAvailable();
+    if (!available) {
+      setState(() {
+        _statusMsg = 'NFC is not available on this device.';
+        _isError = true;
+      });
+      return;
+    }
+    setState(() { _scanning = true; _statusMsg = null; _isError = false; });
+    await NfcService.readUid(
+      onRead: (uid) async {
+        final seniorId = await NfcUidService().lookup(uid);
+        if (!mounted) return;
+        if (seniorId == null) {
+          setState(() {
+            _scanning = false;
+            _statusMsg = 'Card not recognised. Has it been enrolled?';
+            _isError = true;
+          });
+          return;
+        }
+        final seniors = ref.read(seniorsProvider);
+        final match = seniors.where((s) => s.id == seniorId).firstOrNull;
+        if (match == null) {
+          setState(() {
+            _scanning = false;
+            _statusMsg = "That user isn't in your Care Circle.";
+            _isError = true;
+          });
+          return;
+        }
+        selectSenior(ref, seniorId);
+        setState(() {
+          _scanning = false;
+          _statusMsg = 'Now tracking: ${match.name}';
+          _isError = false;
+        });
+      },
+      onError: (msg) {
+        if (mounted) {
+          setState(() { _scanning = false; _statusMsg = msg; _isError = true; });
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    NfcService.stopSession().ignore();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.nfc, size: 20, color: AppColors.sageGreen),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Identify User', style: AppTextStyles.titleMedium),
+                    Text(
+                      'Tap a senior\'s NFC tag to assign this session.',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_statusMsg != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _statusMsg!,
+              style: AppTextStyles.caption.copyWith(
+                color: _isError ? AppColors.terracotta : AppColors.sageGreen,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _scanning ? null : _identify,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.sageGreen,
+                side: BorderSide(
+                    color: AppColors.sageGreen.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: _scanning
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.sageGreen),
+                    )
+                  : const Icon(Icons.sensors, size: 18),
+              label: Text(_scanning ? 'Hold tag to phone…' : 'Scan NFC Tag'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

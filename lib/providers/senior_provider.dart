@@ -88,8 +88,8 @@ class SeniorsNotifier extends Notifier<void> {
   @override
   void build() {}
 
-  /// Creates a new senior and returns the generated join code.
-  Future<String?> addSenior({
+  /// Creates a new senior and returns the seniorId + join code.
+  Future<({String seniorId, String joinCode})?> addSenior({
     required String name,
     required int age,
     required int dailyRepGoal,

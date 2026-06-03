@@ -43,13 +43,17 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final name = _nameCtrl.text.trim();
+    String? seniorId;
     String? joinCode;
     try {
-      joinCode = await ref.read(seniorsNotifierProvider.notifier).addSenior(
-            name: name,
-            age: int.parse(_ageCtrl.text.trim()),
-            dailyRepGoal: int.parse(_goalCtrl.text.trim()),
-          );
+      final result =
+          await ref.read(seniorsNotifierProvider.notifier).addSenior(
+                name: name,
+                age: int.parse(_ageCtrl.text.trim()),
+                dailyRepGoal: int.parse(_goalCtrl.text.trim()),
+              );
+      seniorId = result?.seniorId;
+      joinCode = result?.joinCode;
     } on TimeoutException {
       // Firestore wrote locally; safe to proceed.
     } catch (e) {
@@ -61,6 +65,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
       MaterialPageRoute(
         builder: (_) => SeniorAddedScreen(
           seniorName: name,
+          seniorId: seniorId ?? '',
           joinCode: joinCode ?? '—',
         ),
       ),

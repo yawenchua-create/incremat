@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import 'nfc_write_sheet.dart';
 
 class SeniorAddedScreen extends StatelessWidget {
+  final String seniorId;
   final String seniorName;
   final String joinCode;
 
   const SeniorAddedScreen({
     super.key,
+    required this.seniorId,
     required this.seniorName,
     required this.joinCode,
   });
@@ -95,6 +98,28 @@ class SeniorAddedScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              // Program their NFC tag right after creation.
+              OutlinedButton.icon(
+                onPressed: () => NfcWriteSheet.show(
+                  context,
+                  seniorId: seniorId,
+                  seniorName: seniorName,
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 56),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  side: const BorderSide(color: AppColors.sageGreen),
+                ),
+                icon: const Icon(Icons.nfc, size: 20, color: AppColors.sageGreen),
+                label: Text(
+                  'Enrol NFC Card',
+                  style: AppTextStyles.buttonText
+                      .copyWith(color: AppColors.sageGreen),
+                ),
+              ),
+              const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
                 style: ElevatedButton.styleFrom(

@@ -9,6 +9,7 @@ import '../../providers/hardware_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../auth/login_screen.dart';
+import '../session_music/session_music_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -535,6 +536,45 @@ class _MusicCard extends ConsumerWidget {
                 activeTrackColor: AppColors.sageGreen.withValues(alpha: 0.4),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Divider(color: AppColors.divider),
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SessionMusicScreen()),
+            ),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.lightSage.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.graphic_eq_outlined,
+                        size: 18, color: AppColors.sageGreen),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Session Player', style: AppTextStyles.titleMedium),
+                        Text('Live layers & playback controls',
+                            style: AppTextStyles.caption),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: AppColors.subtleText, size: 20),
+                ],
+              ),
+            ),
           ),
         ],
       ),
