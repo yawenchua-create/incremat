@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../l10n/app_localizations.dart';
 import '../models/senior.dart';
 import '../models/session_log.dart';
 import '../services/notifications/notification_service.dart';
@@ -135,21 +136,21 @@ class SeniorsNotifier extends Notifier<void> {
 
   /// Connects the current caregiver to an existing senior via join code.
   /// Returns null on success, or an error message string.
-  Future<String?> connectSenior(String code) async {
+  Future<String?> connectSenior(String code, AppLocalizations l) async {
     final user = ref.read(authStateProvider).valueOrNull;
-    if (user == null) return 'Not signed in';
+    if (user == null) return l.notSignedIn;
     final seniorId = await JoinCodeService().lookup(code);
     if (seniorId == null) {
-      return "That code wasn't found. Please check with the primary caregiver.";
+      return l.codeNotFound;
     }
     // Check if already connected.
     final existing = await FirebaseFirestore.instance
         .collection('seniors/$seniorId/caregivers')
         .doc(user.uid)
         .get();
-    if (existing.exists) return "You're already monitoring this person.";
+    if (existing.exists) return l.alreadyMonitoring;
     final repo = ref.read(seniorRepositoryProvider);
-    if (repo == null) return 'Not signed in';
+    if (repo == null) return l.notSignedIn;
     await repo.addSecondaryCaregiver(seniorId);
     return null;
   }

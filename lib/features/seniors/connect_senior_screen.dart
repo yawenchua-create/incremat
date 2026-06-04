@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/senior_provider.dart';
 
 class ConnectSeniorScreen extends ConsumerStatefulWidget {
@@ -24,12 +25,13 @@ class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
   Future<void> _connect() async {
     final code = _ctrl.text.trim().toUpperCase();
     if (code.isEmpty) return;
+    final l = AppLocalizations.of(context);
     setState(() => _isConnecting = true);
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final error = await ref
         .read(seniorsNotifierProvider.notifier)
-        .connectSenior(code);
+        .connectSenior(code, l);
     if (!mounted) return;
     setState(() => _isConnecting = false);
     if (error != null) {
@@ -41,6 +43,7 @@ class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       appBar: AppBar(
@@ -48,7 +51,7 @@ class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('IncreMat Caregiver', style: AppTextStyles.labelLarge),
+        title: Text(l.appTitle, style: AppTextStyles.labelLarge),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -58,10 +61,10 @@ class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 32),
-              Text('Connect to a Senior', style: AppTextStyles.displayMedium),
+              Text(l.connectToSenior, style: AppTextStyles.displayMedium),
               const SizedBox(height: 8),
               Text(
-                'Enter the Play code for the person you\'d like to monitor.',
+                l.connectSeniorSubtitle,
                 style: AppTextStyles.bodySmall,
               ),
               const SizedBox(height: 40),
@@ -73,9 +76,9 @@ class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
                   fontSize: 22,
                 ),
                 textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  hintText: 'e.g. WORD-1234',
-                  hintStyle: TextStyle(letterSpacing: 2),
+                decoration: InputDecoration(
+                  hintText: l.connectCodeHint,
+                  hintStyle: const TextStyle(letterSpacing: 2),
                 ),
                 onSubmitted: (_) => _connect(),
               ),
@@ -95,7 +98,7 @@ class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white),
                       )
-                    : Text('Connect', style: AppTextStyles.buttonText),
+                    : Text(l.connect, style: AppTextStyles.buttonText),
               ),
             ],
           ),

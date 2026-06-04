@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/hardware_provider.dart';
 import '../../providers/live_session_provider.dart';
 import '../../providers/senior_provider.dart';
@@ -62,10 +63,11 @@ class _HardwareHeader extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Hardware Status', style: AppTextStyles.headlineLarge),
+              Text(AppLocalizations.of(context).hardwareTitle,
+                  style: AppTextStyles.headlineLarge),
               const SizedBox(height: 4),
               Text(
-                'View the connection and performance\nof your IncreMat sensor.',
+                AppLocalizations.of(context).hardwareSubtitle,
                 style: AppTextStyles.bodySmall,
               ),
             ],
@@ -103,6 +105,7 @@ class _ConnectionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -139,9 +142,9 @@ class _ConnectionBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text('Status: ', style: AppTextStyles.titleMedium),
+          Text(l.statusLabel, style: AppTextStyles.titleMedium),
           Text(
-            status.isConnected ? 'Connected' : 'Disconnected',
+            status.isConnected ? l.connected : l.disconnected,
             style: AppTextStyles.titleMedium.copyWith(
               color: status.isConnected
                   ? AppColors.sageGreen
@@ -151,7 +154,7 @@ class _ConnectionBadge extends StatelessWidget {
           if (status.isConnected) ...[
             const Spacer(),
             Text(
-              status.isMatOnChair ? 'Mat on chair' : 'Mat removed',
+              status.isMatOnChair ? l.matOnChair : l.matRemoved,
               style: AppTextStyles.bodySmall.copyWith(
                 color: status.isMatOnChair
                     ? AppColors.sageGreen
@@ -171,6 +174,7 @@ class _LiveSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -186,9 +190,9 @@ class _LiveSessionCard extends StatelessWidget {
           const Icon(Icons.fitness_center_outlined,
               size: 20, color: AppColors.sageGreen),
           const SizedBox(width: 12),
-          Text('Live session: ', style: AppTextStyles.titleMedium),
+          Text(l.liveSessionLabel, style: AppTextStyles.titleMedium),
           Text(
-            '${liveSession.repCount} reps',
+            l.repsLabel(liveSession.repCount),
             style: AppTextStyles.titleMedium.copyWith(
               color: AppColors.sageGreen,
               fontWeight: FontWeight.w700,
@@ -197,7 +201,7 @@ class _LiveSessionCard extends StatelessWidget {
           if (liveSession.avgRepTimeSeconds > 0) ...[
             const Spacer(),
             Text(
-              '${liveSession.avgRepTimeSeconds.toStringAsFixed(1)}s avg',
+              l.avgSeconds(liveSession.avgRepTimeSeconds.toStringAsFixed(1)),
               style: AppTextStyles.bodySmall,
             ),
           ],
@@ -230,6 +234,12 @@ class _StatusCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final signal = switch (status.signalLabel) {
+      'Strong' => l.signalStrong,
+      'Good' => l.signalGood,
+      _ => l.signalWeak,
+    };
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Row(
@@ -237,7 +247,7 @@ class _StatusCards extends StatelessWidget {
           Expanded(
             child: _InfoCard(
               icon: Icons.battery_charging_full_outlined,
-              label: 'Battery: ${status.batteryPercent}%',
+              label: l.batteryLabel(status.batteryPercent),
               iconColor: _batteryColor(status.batteryPercent),
             ),
           ),
@@ -245,7 +255,7 @@ class _StatusCards extends StatelessWidget {
           Expanded(
             child: _InfoCard(
               icon: Icons.signal_cellular_alt_outlined,
-              label: 'Signal: ${status.signalLabel}',
+              label: l.signalLabelText(signal),
               iconColor: AppColors.sageGreen,
             ),
           ),
@@ -267,6 +277,7 @@ class _ConnectButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final isConnecting = ref.watch(hardwareConnectingProvider);
 
     return Padding(
@@ -296,7 +307,7 @@ class _ConnectButton extends ConsumerWidget {
                   ),
                 )
               : Text(
-                  status.isConnected ? 'Disconnect' : 'Connect to IncreMat',
+                  status.isConnected ? l.disconnect : l.connectToIncreMat,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -310,6 +321,7 @@ class _ConnectButton extends ConsumerWidget {
 
   Future<void> _onTap(
       BuildContext context, WidgetRef ref, bool isConnected) async {
+    final l = AppLocalizations.of(context);
     final service = ref.read(hardwareServiceProvider);
     ref.read(hardwareConnectingProvider.notifier).state = true;
     try {
@@ -321,7 +333,7 @@ class _ConnectButton extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connection failed: $e')),
+          SnackBar(content: Text(l.connectionFailed('$e'))),
         );
       }
     } finally {
@@ -345,10 +357,11 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
   bool _isError = false;
 
   Future<void> _identify() async {
+    final l = AppLocalizations.of(context);
     final available = await NfcService.isAvailable();
     if (!available) {
       setState(() {
-        _statusMsg = 'NFC is not available on this device.';
+        _statusMsg = l.nfcUnavailable;
         _isError = true;
       });
       return;
@@ -361,7 +374,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
         if (seniorId == null) {
           setState(() {
             _scanning = false;
-            _statusMsg = 'Card not recognised. Has it been enrolled?';
+            _statusMsg = l.cardNotRecognised;
             _isError = true;
           });
           return;
@@ -371,7 +384,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
         if (match == null) {
           setState(() {
             _scanning = false;
-            _statusMsg = "That user isn't in your Care Circle.";
+            _statusMsg = l.userNotInCircle;
             _isError = true;
           });
           return;
@@ -379,7 +392,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
         selectSenior(ref, seniorId);
         setState(() {
           _scanning = false;
-          _statusMsg = 'Now tracking: ${match.name}';
+          _statusMsg = l.nowTracking(match.name);
           _isError = false;
         });
       },
@@ -399,6 +412,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       padding: const EdgeInsets.all(16),
@@ -424,9 +438,9 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Identify User', style: AppTextStyles.titleMedium),
+                    Text(l.identifyUser, style: AppTextStyles.titleMedium),
                     Text(
-                      'Tap a senior\'s NFC tag to assign this session.',
+                      l.identifyUserSubtitle,
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -465,7 +479,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
                           strokeWidth: 2, color: AppColors.sageGreen),
                     )
                   : const Icon(Icons.sensors, size: 18),
-              label: Text(_scanning ? 'Hold tag to phone…' : 'Scan NFC Tag'),
+              label: Text(_scanning ? l.holdTagToPhone : l.scanNfcTag),
             ),
           ),
         ],

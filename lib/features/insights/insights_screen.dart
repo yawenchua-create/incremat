@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../reports/export_report_screen.dart';
@@ -30,7 +31,8 @@ class InsightsScreen extends ConsumerWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                    child: Text('Rep Statistics', style: AppTextStyles.headlineSmall),
+                    child: Text(AppLocalizations.of(context).repStatistics,
+                        style: AppTextStyles.headlineSmall),
                   ),
                 ),
                 SliverToBoxAdapter(child: _RepStats()),
@@ -73,13 +75,13 @@ class _InsightsEmptyState extends StatelessWidget {
           Icon(Icons.bar_chart_outlined, size: 48, color: AppColors.lightSage),
           const SizedBox(height: 16),
           Text(
-            'No data yet',
+            AppLocalizations.of(context).noDataYet,
             style: AppTextStyles.headlineSmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Add a loved one on the Home tab to start\ntracking their sit-to-stand progress.',
+            AppLocalizations.of(context).insightsEmptySubtitle,
             style: AppTextStyles.bodySmall,
             textAlign: TextAlign.center,
           ),
@@ -151,10 +153,11 @@ class _InsightsHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Performance Trends', style: AppTextStyles.headlineLarge),
+                Text(AppLocalizations.of(context).performanceTrends,
+                    style: AppTextStyles.headlineLarge),
                 const SizedBox(height: 2),
                 Text(
-                  'Daily rep activity for the current week',
+                  AppLocalizations.of(context).dailyRepActivity,
                   style: AppTextStyles.bodySmall,
                 ),
               ],
@@ -174,7 +177,8 @@ class _InsightsHeader extends StatelessWidget {
                 ),
               ],
             ),
-            child: Text('This Week', style: AppTextStyles.labelMedium),
+            child: Text(AppLocalizations.of(context).thisWeek,
+                style: AppTextStyles.labelMedium),
           ),
         ],
       ),
@@ -183,10 +187,9 @@ class _InsightsHeader extends StatelessWidget {
 }
 
 class _MobilityChart extends ConsumerWidget {
-  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final senior = ref.watch(selectedSeniorProvider);
     if (senior == null) return const SizedBox.shrink();
     final insights = ref.watch(seniorInsightsProvider(senior.id));
@@ -228,7 +231,7 @@ class _MobilityChart extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text('Daily Reps', style: AppTextStyles.caption),
+                  Text(l.dailyRepsLegend, style: AppTextStyles.caption),
                 ],
               ),
               Container(
@@ -255,7 +258,7 @@ class _MobilityChart extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text('Weekly Consistency', style: AppTextStyles.caption),
+          Text(l.weeklyConsistency, style: AppTextStyles.caption),
           const SizedBox(height: 16),
           SizedBox(
             height: 160,
@@ -292,7 +295,7 @@ class _MobilityChart extends ConsumerWidget {
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            i < _days.length ? _days[i] : '',
+                            i < 7 ? l.weekdayShort(i) : '',
                             style: AppTextStyles.caption,
                           ),
                         );
@@ -335,7 +338,7 @@ class _MobilityChart extends ConsumerWidget {
               Icon(Icons.eco, size: 14, color: AppColors.sageGreen),
               const SizedBox(width: 6),
               Text(
-                'Consistent progress. Keep up the great work!',
+                l.consistentProgress,
                 style: AppTextStyles.caption.copyWith(color: AppColors.sageGreen),
               ),
             ],
@@ -349,6 +352,7 @@ class _MobilityChart extends ConsumerWidget {
 class _RepStats extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final senior = ref.watch(selectedSeniorProvider);
     if (senior == null) return const SizedBox.shrink();
     final insights = ref.watch(seniorInsightsProvider(senior.id));
@@ -373,11 +377,11 @@ class _RepStats extends ConsumerWidget {
           Expanded(
             child: _StatCard(
               icon: Icons.speed_outlined,
-              title: 'Speed',
-              subtitle: 'Average Rep Time',
+              title: l.speed,
+              subtitle: l.averageRepTime,
               value: insights.avgRepTimeSeconds.toStringAsFixed(1),
-              unit: 'sec',
-              label: 'per repetition this month',
+              unit: l.secUnit,
+              label: l.perRepetitionMonth,
               spots: repSpots.length >= 2 ? repSpots : fallbackSpots,
             ),
           ),
@@ -385,11 +389,12 @@ class _RepStats extends ConsumerWidget {
           Expanded(
             child: _StatCard(
               icon: Icons.track_changes_outlined,
-              title: 'Consistency',
-              subtitle: 'Rep Completion Rate',
+              title: l.consistency,
+              subtitle: l.repCompletionRate,
               value: '${insights.consistencyPercent.toInt()}',
               unit: '%',
-              label: '${insights.daysActiveThisMonth}/${insights.totalDaysThisMonth} days active',
+              label: l.daysActiveMonth(
+                  insights.daysActiveThisMonth, insights.totalDaysThisMonth),
               spots: consistencySpots.length >= 2 ? consistencySpots : fallbackSpots,
             ),
           ),
@@ -551,7 +556,7 @@ class _InsightsCta extends StatelessWidget {
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                'Small, consistent efforts\nlead to meaningful progress.',
+                AppLocalizations.of(context).insightsCta,
                 style: AppTextStyles.bodyMedium,
               ),
             ),

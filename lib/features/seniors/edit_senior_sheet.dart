@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../providers/senior_provider.dart';
 
@@ -46,7 +47,8 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save changes: $e')),
+          SnackBar(content: Text(
+              AppLocalizations.of(context).failedToSaveChanges('$e'))),
         );
       }
     } finally {
@@ -56,6 +58,7 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -81,33 +84,33 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              Text('Edit ${widget.senior.name}', style: AppTextStyles.headlineSmall),
+              Text(l.editSenior(widget.senior.name), style: AppTextStyles.headlineSmall),
               const SizedBox(height: 24),
               TextFormField(
                 controller: _nameCtrl,
                 style: AppTextStyles.bodyMedium,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  hintText: 'Name',
-                  prefixIcon: Icon(Icons.person_outline, color: AppColors.subtleText, size: 20),
+                decoration: InputDecoration(
+                  hintText: l.name,
+                  prefixIcon: const Icon(Icons.person_outline, color: AppColors.subtleText, size: 20),
                 ),
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Enter a name' : null,
+                    v == null || v.trim().isEmpty ? l.enterAName : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _ageCtrl,
                 keyboardType: TextInputType.number,
                 style: AppTextStyles.bodyMedium,
-                decoration: const InputDecoration(
-                  hintText: 'Age',
-                  prefixIcon: Icon(Icons.calendar_today_outlined,
+                decoration: InputDecoration(
+                  hintText: l.age,
+                  prefixIcon: const Icon(Icons.calendar_today_outlined,
                       color: AppColors.subtleText, size: 20),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter age';
+                  if (v == null || v.isEmpty) return l.enterAge;
                   final age = int.tryParse(v);
-                  if (age == null || age < 1 || age > 120) return 'Enter a valid age';
+                  if (age == null || age < 1 || age > 120) return l.enterValidAge;
                   return null;
                 },
               ),
@@ -122,7 +125,7 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text('Save Changes', style: AppTextStyles.buttonText),
+                      : Text(l.saveChanges, style: AppTextStyles.buttonText),
                 ),
               ),
             ],

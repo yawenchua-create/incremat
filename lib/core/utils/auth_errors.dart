@@ -1,27 +1,29 @@
-String friendlyAuthError(Object? error) {
+import '../../l10n/app_localizations.dart';
+
+String friendlyAuthError(AppLocalizations l, Object? error) {
   final raw = error.toString();
   final codeMatch = RegExp(r'\[firebase_auth/([^\]]+)\]').firstMatch(raw);
   switch (codeMatch?.group(1) ?? '') {
     case 'user-not-found':
     case 'wrong-password':
     case 'invalid-credential':
-      return 'Incorrect email or password. Please try again.';
+      return l.errIncorrectCredentials;
     case 'email-already-in-use':
-      return 'An account with this email already exists.';
+      return l.errEmailInUse;
     case 'weak-password':
-      return 'Password must be at least 6 characters.';
+      return l.errWeakPassword;
     case 'invalid-email':
-      return 'Please enter a valid email address.';
+      return l.errInvalidEmail;
     case 'user-disabled':
-      return 'This account has been disabled. Please contact support.';
+      return l.errUserDisabled;
     case 'too-many-requests':
-      return 'Too many attempts. Please wait a moment and try again.';
+      return l.errTooManyRequests;
     case 'network-request-failed':
-      return 'No internet connection. Please check your network.';
+      return l.errNoNetwork;
     case 'requires-recent-login':
-      return 'Please sign in again before making this change.';
+      return l.errRecentLogin;
     default:
       final idx = raw.lastIndexOf('] ');
-      return idx == -1 ? 'Something went wrong. Please try again.' : raw.substring(idx + 2);
+      return idx == -1 ? l.errGeneric : raw.substring(idx + 2);
   }
 }

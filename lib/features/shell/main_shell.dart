@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../home/home_screen.dart';
 import '../insights/insights_screen.dart';
 import '../hardware/hardware_screen.dart';
@@ -16,29 +17,6 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  static const _destinations = [
-    NavigationDestination(
-      icon: Icon(Icons.home_outlined),
-      selectedIcon: Icon(Icons.home),
-      label: 'Home',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.bar_chart_outlined),
-      selectedIcon: Icon(Icons.bar_chart),
-      label: 'Insights',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.watch_outlined),
-      selectedIcon: Icon(Icons.watch),
-      label: 'Hardware',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.settings_outlined),
-      selectedIcon: Icon(Icons.settings),
-      label: 'Settings',
-    ),
-  ];
-
   final _screens = const [
     HomeScreen(),
     InsightsScreen(),
@@ -48,6 +26,30 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final destinations = [
+      NavigationDestination(
+        icon: const Icon(Icons.home_outlined),
+        selectedIcon: const Icon(Icons.home),
+        label: l.navHome,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.bar_chart_outlined),
+        selectedIcon: const Icon(Icons.bar_chart),
+        label: l.navInsights,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.watch_outlined),
+        selectedIcon: const Icon(Icons.watch),
+        label: l.navHardware,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.settings_outlined),
+        selectedIcon: const Icon(Icons.settings),
+        label: l.navSettings,
+      ),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -62,7 +64,7 @@ class _MainShellState extends State<MainShell> {
         child: NavigationBar(
           selectedIndex: _currentIndex,
           onDestinationSelected: (i) => setState(() => _currentIndex = i),
-          destinations: _destinations,
+          destinations: destinations,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           animationDuration: const Duration(milliseconds: 300),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
@@ -14,6 +15,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final seniorsAsync = ref.watch(seniorsStreamProvider);
 
     void onAddPerson() => Navigator.of(context).push(
@@ -93,19 +95,19 @@ class HomeScreen extends ConsumerWidget {
                                 return await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
-                                    title: Text('Remove ${senior.name}?'),
-                                    content: const Text(
-                                      'This will remove them from your care circle.',
+                                    title: Text(l.removePersonQ(senior.name)),
+                                    content: Text(
+                                      l.removeFromCircle,
                                     ),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(ctx, false),
-                                        child: const Text('Cancel'),
+                                        child: Text(l.cancel),
                                       ),
                                       TextButton(
                                         onPressed: () => Navigator.pop(ctx, true),
                                         child: Text(
-                                          'Remove',
+                                          l.remove,
                                           style: TextStyle(color: AppColors.terracotta),
                                         ),
                                       ),
@@ -140,7 +142,7 @@ class HomeScreen extends ConsumerWidget {
                     child: OutlinedButton.icon(
                       onPressed: onConnectSenior,
                       icon: const Icon(Icons.link, size: 18),
-                      label: const Text('Add Existing Senior'),
+                      label: Text(l.addExistingSenior),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
@@ -167,6 +169,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       child: Column(
@@ -189,13 +192,13 @@ class _EmptyState extends StatelessWidget {
                 Icon(Icons.eco, size: 52, color: AppColors.lightSage),
                 const SizedBox(height: 16),
                 Text(
-                  'No loved ones yet',
+                  l.noLovedOnes,
                   style: AppTextStyles.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Add your first loved one to start\ntracking their sit-to-stand progress.',
+                  l.noLovedOnesSubtitle,
                   style: AppTextStyles.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -203,13 +206,13 @@ class _EmptyState extends StatelessWidget {
                 ElevatedButton.icon(
                   onPressed: onAddPerson,
                   icon: const Icon(Icons.add, size: 18),
-                  label: Text('Add a Loved One', style: AppTextStyles.buttonText),
+                  label: Text(l.addALovedOne, style: AppTextStyles.buttonText),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: onConnectSenior,
                   icon: const Icon(Icons.link, size: 18),
-                  label: const Text('Add Existing Senior'),
+                  label: Text(l.addExistingSenior),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
                     shape: RoundedRectangleBorder(
@@ -247,7 +250,7 @@ class _ErrorCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Could not load seniors: $message',
+              AppLocalizations.of(context).couldNotLoadSeniors(message),
               style: AppTextStyles.bodySmall,
             ),
           ),
@@ -268,7 +271,8 @@ class _Header extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Your Loved Ones', style: AppTextStyles.headlineLarge),
+          Text(AppLocalizations.of(context).yourLovedOnes,
+              style: AppTextStyles.headlineLarge),
           GestureDetector(
             onTap: onAddPerson,
             child: Container(
@@ -301,17 +305,18 @@ class _SeniorCard extends ConsumerWidget {
 
   const _SeniorCard({required this.senior, required this.onTap});
 
-  String _freshnessLabel(DateTime? date) {
-    if (date == null) return 'No sessions yet';
+  String _freshnessLabel(AppLocalizations l, DateTime? date) {
+    if (date == null) return l.noSessionsYet;
     final now = DateTime.now();
     final diff = now.difference(date).inDays;
-    if (diff == 0) return 'Last session: Today';
-    if (diff == 1) return 'Last session: Yesterday';
-    return 'Last session: ${diff}d ago';
+    if (diff == 0) return l.lastSessionToday;
+    if (diff == 1) return l.lastSessionYesterday;
+    return l.lastSessionDaysAgo(diff);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final insights = ref.watch(seniorInsightsProvider(senior.id));
     final todayReps = insights.todayReps;
     final goalReps = senior.dailyRepGoal;
@@ -348,7 +353,7 @@ class _SeniorCard extends ConsumerWidget {
                       children: [
                         Text(senior.name, style: AppTextStyles.headlineSmall),
                         Text(
-                          _freshnessLabel(insights.lastSessionDate),
+                          _freshnessLabel(l, insights.lastSessionDate),
                           style: AppTextStyles.caption,
                         ),
                       ],
@@ -363,7 +368,7 @@ class _SeniorCard extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('Today', style: AppTextStyles.caption),
+                        Text(l.today, style: AppTextStyles.caption),
                         const SizedBox(width: 4),
                         Container(
                           width: 6,
@@ -395,20 +400,22 @@ class _SeniorCard extends ConsumerWidget {
                       children: [
                         _StatRow(
                           icon: repDiff >= 0 ? Icons.trending_up : Icons.trending_down,
-                          label: 'vs. yesterday',
-                          value: '$repDiffSign$repDiff reps',
+                          label: l.vsYesterday,
+                          value: '$repDiffSign${l.repsLabel(repDiff)}',
                         ),
                         const SizedBox(height: 12),
                         _StatRow(
                           icon: Icons.timer_outlined,
-                          label: 'Avg. Time',
-                          value: '${insights.avgRepTimeSeconds.toStringAsFixed(1)}s',
+                          label: l.avgTime,
+                          value: l.secondsShort(
+                              insights.avgRepTimeSeconds.toStringAsFixed(1)),
                         ),
                         const SizedBox(height: 12),
                         _StatRow(
                           icon: Icons.bar_chart_outlined,
-                          label: 'This Week',
-                          value: '${insights.daysActiveThisWeek} of ${insights.daysInWeek} days',
+                          label: l.thisWeek,
+                          value: l.daysActiveOfWeek(
+                              insights.daysActiveThisWeek, insights.daysInWeek),
                         ),
                       ],
                     ),
@@ -487,10 +494,10 @@ class _ProgressCircle extends StatelessWidget {
               ),
               Text(
                 progress >= 1.0
-                    ? 'Goal met!'
+                    ? AppLocalizations.of(context).goalMet
                     : current == 0
-                        ? 'Not started'
-                        : 'Keep going!',
+                        ? AppLocalizations.of(context).notStarted
+                        : AppLocalizations.of(context).keepGoing,
                 style: AppTextStyles.caption.copyWith(color: AppColors.sageGreen),
               ),
             ],
