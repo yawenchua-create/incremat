@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/senior_provider.dart';
 import 'senior_added_screen.dart';
 
@@ -40,6 +41,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
+    final l = AppLocalizations.of(context);
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final name = _nameCtrl.text.trim();
@@ -57,7 +59,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
     } on TimeoutException {
       // Firestore wrote locally; safe to proceed.
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(l.failedToSave('$e'))));
       if (mounted) setState(() => _isSaving = false);
       return;
     }
@@ -74,6 +76,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       appBar: AppBar(
@@ -81,7 +84,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('IncreMat Caregiver', style: AppTextStyles.labelLarge),
+        title: Text(l.appTitle, style: AppTextStyles.labelLarge),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -104,7 +107,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text('Add a Loved One', style: AppTextStyles.displayMedium),
+                Text(l.addALovedOne, style: AppTextStyles.displayMedium),
                 const SizedBox(height: 28),
                 // Avatar picker
                 Stack(
@@ -137,34 +140,34 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
                 const SizedBox(height: 32),
                 _FormField(
                   controller: _nameCtrl,
-                  hint: 'Senior Name',
+                  hint: l.seniorName,
                   icon: Icons.person_outline,
-                  validator: (v) => v == null || v.isEmpty ? 'Enter a name' : null,
+                  validator: (v) => v == null || v.isEmpty ? l.enterAName : null,
                 ),
                 const SizedBox(height: 12),
                 _FormField(
                   controller: _ageCtrl,
-                  hint: 'Age',
+                  hint: l.age,
                   icon: Icons.calendar_today_outlined,
                   keyboardType: TextInputType.number,
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter age';
+                    if (v == null || v.isEmpty) return l.enterAge;
                     final age = int.tryParse(v);
-                    if (age == null || age < 1 || age > 120) return 'Enter a valid age';
+                    if (age == null || age < 1 || age > 120) return l.enterValidAge;
                     return null;
                   },
                 ),
                 const SizedBox(height: 12),
                 _FormField(
                   controller: _goalCtrl,
-                  hint: 'Daily Rep Goal',
+                  hint: l.dailyRepGoal,
                   icon: Icons.track_changes_outlined,
                   keyboardType: TextInputType.number,
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter a goal';
+                    if (v == null || v.isEmpty) return l.enterAGoal;
                     final goal = int.tryParse(v);
                     if (goal == null || goal < 5 || goal > 50) {
-                      return 'Enter a goal between 5 and 50';
+                      return l.goalBetween;
                     }
                     return null;
                   },
@@ -212,13 +215,13 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _paired ? 'IncreMat Paired' : 'Pair IncreMat',
+                                _paired ? l.incrematPaired : l.pairIncreMat,
                                 style: AppTextStyles.titleMedium,
                               ),
                               Text(
                                 _paired
-                                    ? 'Connected successfully'
-                                    : 'Connect your IncreMat via Bluetooth',
+                                    ? l.connectedSuccessfully
+                                    : l.connectViaBluetooth,
                                 style: AppTextStyles.caption,
                               ),
                             ],
@@ -253,7 +256,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
                           children: [
                             const Icon(Icons.people_outline, size: 20),
                             const SizedBox(width: 8),
-                            Text('Add to Care Circle',
+                            Text(l.addToCareCircle,
                                 style: AppTextStyles.buttonText),
                           ],
                         ),

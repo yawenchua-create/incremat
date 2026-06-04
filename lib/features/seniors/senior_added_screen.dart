@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import 'nfc_write_sheet.dart';
 
 class SeniorAddedScreen extends StatelessWidget {
@@ -18,6 +19,7 @@ class SeniorAddedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       body: SafeArea(
@@ -29,7 +31,7 @@ class SeniorAddedScreen extends StatelessWidget {
               Icon(Icons.check_circle_outline, size: 72, color: AppColors.sageGreen),
               const SizedBox(height: 24),
               Text(
-                '$seniorName has been added\nto your Care Circle.',
+                l.seniorAddedToCircle(seniorName),
                 style: AppTextStyles.headlineMedium,
                 textAlign: TextAlign.center,
               ),
@@ -51,7 +53,7 @@ class SeniorAddedScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(
-                      'Their Play Code is:',
+                      l.theirPlayCode,
                       style: AppTextStyles.bodySmall,
                     ),
                     const SizedBox(height: 12),
@@ -70,7 +72,7 @@ class SeniorAddedScreen extends StatelessWidget {
                           onTap: () {
                             Clipboard.setData(ClipboardData(text: joinCode));
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Code copied to clipboard')),
+                              SnackBar(content: Text(l.codeCopied)),
                             );
                           },
                           child: Container(
@@ -90,7 +92,7 @@ class SeniorAddedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Share this with $seniorName to\nlog into IncreMat Play.',
+                      l.shareCodeWith(seniorName),
                       style: AppTextStyles.caption,
                       textAlign: TextAlign.center,
                     ),
@@ -114,7 +116,7 @@ class SeniorAddedScreen extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.nfc, size: 20, color: AppColors.sageGreen),
                 label: Text(
-                  'Enrol NFC Card',
+                  l.enrolNfcCard,
                   style: AppTextStyles.buttonText
                       .copyWith(color: AppColors.sageGreen),
                 ),
@@ -128,7 +130,7 @@ class SeniorAddedScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(28),
                   ),
                 ),
-                child: Text('Done', style: AppTextStyles.buttonText),
+                child: Text(l.done, style: AppTextStyles.buttonText),
               ),
               const SizedBox(height: 32),
             ],

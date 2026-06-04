@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../providers/senior_provider.dart';
 
@@ -40,7 +41,8 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save session: $e')),
+          SnackBar(content: Text(
+              AppLocalizations.of(context).failedToSaveSession('$e'))),
         );
       }
     } finally {
@@ -50,6 +52,7 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -75,10 +78,10 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              Text('Record Session', style: AppTextStyles.headlineSmall),
+              Text(l.recordSession, style: AppTextStyles.headlineSmall),
               const SizedBox(height: 4),
               Text(
-                'Log a sit-to-stand session for ${widget.senior.name}',
+                l.logSessionFor(widget.senior.name),
                 style: AppTextStyles.bodySmall,
               ),
               const SizedBox(height: 24),
@@ -86,14 +89,14 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
                 controller: _repsCtrl,
                 keyboardType: TextInputType.number,
                 style: AppTextStyles.bodyMedium,
-                decoration: const InputDecoration(
-                  hintText: 'Number of reps',
-                  prefixIcon: Icon(Icons.repeat_outlined, color: AppColors.subtleText, size: 20),
+                decoration: InputDecoration(
+                  hintText: l.numberOfReps,
+                  prefixIcon: const Icon(Icons.repeat_outlined, color: AppColors.subtleText, size: 20),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter rep count';
+                  if (v == null || v.isEmpty) return l.enterRepCount;
                   final n = int.tryParse(v);
-                  if (n == null || n < 1) return 'Enter a valid number';
+                  if (n == null || n < 1) return l.enterValidNumber;
                   return null;
                 },
               ),
@@ -102,14 +105,14 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
                 controller: _timeCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: AppTextStyles.bodyMedium,
-                decoration: const InputDecoration(
-                  hintText: 'Avg. time per rep (seconds)',
-                  prefixIcon: Icon(Icons.timer_outlined, color: AppColors.subtleText, size: 20),
+                decoration: InputDecoration(
+                  hintText: l.avgTimePerRep,
+                  prefixIcon: const Icon(Icons.timer_outlined, color: AppColors.subtleText, size: 20),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter average time';
+                  if (v == null || v.isEmpty) return l.enterAverageTime;
                   final n = double.tryParse(v);
-                  if (n == null || n <= 0) return 'Enter a valid time';
+                  if (n == null || n <= 0) return l.enterValidTime;
                   return null;
                 },
               ),
@@ -129,7 +132,7 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
                           children: [
                             const Icon(Icons.save_outlined, size: 18),
                             const SizedBox(width: 8),
-                            Text('Save Session', style: AppTextStyles.buttonText),
+                            Text(l.saveSession, style: AppTextStyles.buttonText),
                           ],
                         ),
                 ),

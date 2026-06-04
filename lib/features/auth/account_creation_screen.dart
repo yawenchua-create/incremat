@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/auth_errors.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../seniors/add_loved_one_screen.dart';
 import '../shell/main_shell.dart';
@@ -41,12 +42,13 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final authState = ref.watch(authNotifierProvider);
 
     ref.listen(authNotifierProvider, (_, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyAuthError(next.error))),
+          SnackBar(content: Text(friendlyAuthError(l, next.error))),
         );
       } else if (!next.isLoading && next.value != null) {
         // Navigate to MainShell; _PostSignupLauncher pushes AddLovedOneScreen on top.
@@ -72,7 +74,7 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
                 _Illustration(),
                 const SizedBox(height: 28),
                 Text(
-                  'Care begins with ',
+                  l.careBeginsWith,
                   style: AppTextStyles.displayMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -81,7 +83,7 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: 'you',
+                        text: l.careBeginsYou,
                         style: AppTextStyles.displayMedium.copyWith(
                           fontStyle: FontStyle.italic,
                           color: AppColors.sageGreen,
@@ -96,33 +98,33 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Create your account to support,\nnurture, and make a difference.',
+                  l.createAccountSubtitle,
                   style: AppTextStyles.bodyMedium.copyWith(color: AppColors.subtleText),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
                 _InputField(
                   controller: _nameCtrl,
-                  hint: 'Name',
+                  hint: l.name,
                   icon: Icons.person_outline,
-                  validator: (v) => v == null || v.isEmpty ? 'Enter your name' : null,
+                  validator: (v) => v == null || v.isEmpty ? l.enterYourName : null,
                 ),
                 const SizedBox(height: 12),
                 _InputField(
                   controller: _emailCtrl,
-                  hint: 'Email',
+                  hint: l.email,
                   icon: Icons.mail_outline,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter your email';
-                    if (!v.contains('@')) return 'Enter a valid email';
+                    if (v == null || v.isEmpty) return l.enterYourEmail;
+                    if (!v.contains('@')) return l.enterValidEmail;
                     return null;
                   },
                 ),
                 const SizedBox(height: 12),
                 _InputField(
                   controller: _passwordCtrl,
-                  hint: 'Password',
+                  hint: l.password,
                   icon: Icons.lock_outline,
                   obscureText: _obscurePassword,
                   suffixIcon: IconButton(
@@ -134,7 +136,7 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
                   validator: (v) {
-                    if (v == null || v.length < 6) return 'Minimum 6 characters';
+                    if (v == null || v.length < 6) return l.minSixChars;
                     return null;
                   },
                 ),
@@ -153,7 +155,7 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('Create Account', style: AppTextStyles.buttonText),
+                            Text(l.createAccount, style: AppTextStyles.buttonText),
                             const SizedBox(width: 8),
                             const Icon(Icons.eco_outlined, size: 18),
                           ],
@@ -166,7 +168,7 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
                     const Icon(Icons.shield_outlined, size: 14, color: AppColors.subtleText),
                     const SizedBox(width: 6),
                     Text(
-                      'Your information is safe with us.',
+                      l.infoSafe,
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -177,7 +179,7 @@ class _AccountCreationScreenState extends ConsumerState<AccountCreationScreen> {
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                   ),
                   child: Text(
-                    'Already have an account? Sign in',
+                    l.haveAccountSignIn,
                     style: AppTextStyles.bodySmall.copyWith(color: AppColors.sageGreen),
                   ),
                 ),
@@ -212,7 +214,7 @@ class _Logo extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'C A R E G I V E R',
+          AppLocalizations.of(context).caregiverOverline,
           style: AppTextStyles.overline.copyWith(letterSpacing: 3),
         ),
       ],

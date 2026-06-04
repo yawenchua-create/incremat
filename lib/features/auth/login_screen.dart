@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/auth_errors.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../shell/main_shell.dart';
 import 'account_creation_screen.dart';
@@ -37,10 +38,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _forgotPassword() async {
+    final l = AppLocalizations.of(context);
     final email = _emailCtrl.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your email above first.')),
+        SnackBar(content: Text(l.enterEmailFirst)),
       );
       return;
     }
@@ -48,13 +50,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Password reset email sent to $email')),
+          SnackBar(content: Text(l.passwordResetSent(email))),
         );
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyAuthError(e))),
+          SnackBar(content: Text(friendlyAuthError(l, e))),
         );
       }
     }
@@ -62,12 +64,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final authState = ref.watch(authNotifierProvider);
 
     ref.listen(authNotifierProvider, (_, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyAuthError(next.error))),
+          SnackBar(content: Text(friendlyAuthError(l, next.error))),
         );
       } else if (!next.isLoading && next.value != null) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -102,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Text('IncreMat', style: AppTextStyles.headlineLarge),
                     const SizedBox(height: 2),
                     Text(
-                      'C A R E G I V E R',
+                      l.caregiverOverline,
                       style: AppTextStyles.overline.copyWith(letterSpacing: 3),
                     ),
                   ],
@@ -110,13 +113,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 48),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Welcome back.', style: AppTextStyles.headlineMedium),
+                  child: Text(l.welcomeBack, style: AppTextStyles.headlineMedium),
                 ),
                 const SizedBox(height: 4),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Sign in to your account.',
+                    l.signInToAccount,
                     style: AppTextStyles.bodyMedium.copyWith(color: AppColors.subtleText),
                   ),
                 ),
@@ -125,13 +128,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
                   style: AppTextStyles.bodyMedium,
-                  decoration: const InputDecoration(
-                    hintText: 'Email',
-                    prefixIcon: Icon(Icons.mail_outline, color: AppColors.subtleText, size: 20),
+                  decoration: InputDecoration(
+                    hintText: l.email,
+                    prefixIcon: const Icon(Icons.mail_outline, color: AppColors.subtleText, size: 20),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter your email';
-                    if (!v.contains('@')) return 'Enter a valid email';
+                    if (v == null || v.isEmpty) return l.enterYourEmail;
+                    if (!v.contains('@')) return l.enterValidEmail;
                     return null;
                   },
                 ),
@@ -141,7 +144,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   obscureText: _obscurePassword,
                   style: AppTextStyles.bodyMedium,
                   decoration: InputDecoration(
-                    hintText: 'Password',
+                    hintText: l.password,
                     prefixIcon: const Icon(Icons.lock_outline, color: AppColors.subtleText, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -153,7 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   validator: (v) =>
-                      v == null || v.isEmpty ? 'Enter your password' : null,
+                      v == null || v.isEmpty ? l.enterYourPassword : null,
                 ),
                 const SizedBox(height: 8),
                 Align(
@@ -161,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: TextButton(
                     onPressed: _forgotPassword,
                     child: Text(
-                      'Forgot password?',
+                      l.forgotPassword,
                       style: AppTextStyles.caption.copyWith(color: AppColors.sageGreen),
                     ),
                   ),
@@ -178,7 +181,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : Text('Sign In', style: AppTextStyles.buttonText),
+                      : Text(l.signIn, style: AppTextStyles.buttonText),
                 ),
                 const SizedBox(height: 24),
                 TextButton(
@@ -186,7 +189,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     MaterialPageRoute(builder: (_) => const AccountCreationScreen()),
                   ),
                   child: Text(
-                    "Don't have an account? Create one",
+                    l.noAccountCreate,
                     style: AppTextStyles.bodySmall.copyWith(color: AppColors.sageGreen),
                   ),
                 ),

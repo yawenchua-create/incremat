@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/session_music_provider.dart';
 
 /// Session Music — a calming, rep-driven layered player that mirrors the
@@ -53,15 +54,15 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Session Music', style: AppTextStyles.headlineLarge),
+              Text(AppLocalizations.of(context).sessionMusic,
+                  style: AppTextStyles.headlineLarge),
               const SizedBox(height: 6),
               Consumer(
                 builder: (context, ref, _) {
                   final song = ref.watch(
                       sessionMusicProvider.select((s) => s.songName));
                   return Text(
-                    'Now loaded: $song — layers up live as your loved one '
-                    'exercises, driven by the mat\'s rep count.',
+                    AppLocalizations.of(context).musicNowLoaded(song),
                     style: AppTextStyles.bodySmall,
                   );
                 },
@@ -97,33 +98,34 @@ class _NowPlayingCard extends ConsumerWidget {
 
   final SessionMusicState state;
 
-  String get _label {
-    if (state.ended) return 'Session Complete';
-    if (!state.started) return 'Waiting for First Rep';
-    return state.isPlaying ? 'Now Playing' : 'Paused';
+  String _label(AppLocalizations l) {
+    if (state.ended) return l.musicSessionCompleteLabel;
+    if (!state.started) return l.musicWaitingFirstRep;
+    return state.isPlaying ? l.musicNowPlaying : l.musicPaused;
   }
 
-  String get _title {
-    if (state.ended) return 'Session complete';
-    if (!state.started) return 'Ready when the session starts';
-    return 'Layer ${state.layer} · ${kLayerNames[state.layer - 1]}';
+  String _titleText(AppLocalizations l) {
+    if (state.ended) return l.musicSessionComplete;
+    if (!state.started) return l.musicReadyWhenStarts;
+    return l.musicLayerTitle(state.layer, l.layerName(state.layer - 1));
   }
 
-  String get _subtitle {
+  String _subtitle(AppLocalizations l) {
     if (state.assetMissing) {
-      return 'Stem files not found — add them under assets/audio/stems/';
+      return l.musicStemsMissing;
     }
     if (state.ended) {
-      return 'Session ended · ${state.reps} reps';
+      return l.musicSessionEnded(state.reps);
     }
     if (!state.started) {
-      return 'Music begins automatically on the first rep detected';
+      return l.musicBeginsAutomatically;
     }
-    return '${state.layer} of $kLayerCount stems playing · ${state.reps} reps';
+    return l.musicStemsPlaying(state.layer, kLayerCount, state.reps);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final notifier = ref.read(sessionMusicProvider.notifier);
     final active = state.started && state.isPlaying && !state.ended;
 
@@ -148,16 +150,16 @@ class _NowPlayingCard extends ConsumerWidget {
               _Equalizer(animating: active, color: AppColors.sageGreen),
               const SizedBox(width: 10),
               Text(
-                _label.toUpperCase(),
+                _label(l).toUpperCase(),
                 style: AppTextStyles.overline
                     .copyWith(color: AppColors.positiveGreen),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          Text(_title, style: AppTextStyles.displayMedium),
+          Text(_titleText(l), style: AppTextStyles.displayMedium),
           const SizedBox(height: 5),
-          Text(_subtitle, style: AppTextStyles.bodySmall),
+          Text(_subtitle(l), style: AppTextStyles.bodySmall),
           const SizedBox(height: 18),
           _StatRow(state: state),
           const SizedBox(height: 18),
@@ -191,19 +193,20 @@ class _StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
-        _Stat(label: 'Reps', value: '${state.reps}'),
+        _Stat(label: l.musicReps, value: '${state.reps}'),
         _divider(),
         _Stat(
-            label: 'Layers',
+            label: l.musicLayers,
             value: state.started ? '${state.layer}/$kLayerCount' : '—'),
         _divider(),
         _Stat(
-            label: 'Next Layer',
+            label: l.musicNextLayer,
             value: state.started && state.layer < kLayerCount
-                ? 'rep ${state.layer * state.repsPerLayer}'
-                : (state.started ? 'full' : '—')),
+                ? l.musicRepN(state.layer * state.repsPerLayer)
+                : (state.started ? l.musicFull : '—')),
       ],
     );
   }
@@ -309,6 +312,7 @@ class _Controls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final enabled = state.started;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -316,7 +320,7 @@ class _Controls extends StatelessWidget {
         _SideButton(
           icon: Icons.stop_rounded,
           onTap: enabled && !state.ended ? onStop : null,
-          tooltip: 'End session',
+          tooltip: l.musicEndSession,
         ),
         const SizedBox(width: 22),
         _PlayButton(
@@ -327,7 +331,7 @@ class _Controls extends StatelessWidget {
         _SideButton(
           icon: Icons.replay_rounded,
           onTap: enabled ? onRestart : null,
-          tooltip: 'Restart from chunk 1',
+          tooltip: l.musicRestart,
         ),
       ],
     );
@@ -404,12 +408,15 @@ class _LayersHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('Session Layers', style: AppTextStyles.headlineMedium),
+        Text(l.musicSessionLayers, style: AppTextStyles.headlineMedium),
         Text(
-          activeLayer == 0 ? '$kLayerCount layers' : 'Layer $activeLayer active',
+          activeLayer == 0
+              ? l.musicLayersCount(kLayerCount)
+              : l.musicLayerActive(activeLayer),
           style: AppTextStyles.bodySmall,
         ),
       ],
@@ -425,6 +432,7 @@ class _LayerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final unlocked = state.started && layer <= state.layer;
     final isCurrent = state.started && layer == state.layer && !state.ended;
     final animating = isCurrent && state.isPlaying;
@@ -478,21 +486,21 @@ class _LayerRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Layer $layer · ${kLayerNames[layer - 1]}',
+                  l.musicLayerTitle(layer, l.layerName(layer - 1)),
                   style: AppTextStyles.titleMedium,
                 ),
                 const SizedBox(height: 1),
-                Text(kLayerHints[layer - 1], style: AppTextStyles.bodySmall),
+                Text(l.layerHint(layer - 1), style: AppTextStyles.bodySmall),
               ],
             ),
           ),
           const SizedBox(width: 8),
           Text(
             isCurrent
-                ? (state.isPlaying ? 'Playing' : 'Paused')
+                ? (state.isPlaying ? l.musicPlaying : l.musicPaused)
                 : unlocked
-                    ? 'Unlocked'
-                    : 'Rep ${layer == 1 ? 1 : (layer - 1) * state.repsPerLayer}',
+                    ? l.musicUnlocked
+                    : l.musicRepN(layer == 1 ? 1 : (layer - 1) * state.repsPerLayer),
             style: AppTextStyles.caption.copyWith(
               color: isCurrent ? AppColors.positiveGreen : AppColors.subtleText,
               fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,

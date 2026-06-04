@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_wrapper.dart';
 import 'firebase_options.dart';
+import 'l10n/app_localizations.dart';
+import 'providers/locale_provider.dart';
 import 'services/notifications/notification_service.dart';
 
 void main() async {
@@ -15,15 +17,19 @@ void main() async {
   runApp(const ProviderScope(child: IncrematApp()));
 }
 
-class IncrematApp extends StatelessWidget {
+class IncrematApp extends ConsumerWidget {
   const IncrematApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider);
     return MaterialApp(
       title: 'IncreMat Caregiver',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: const AuthWrapper(),
     );
   }

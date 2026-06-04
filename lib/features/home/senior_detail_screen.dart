@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../models/session_log.dart';
 import '../../providers/insights_provider.dart';
@@ -72,14 +73,16 @@ class SeniorDetailScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-                child: Text('Monthly Summary', style: AppTextStyles.headlineSmall),
+                child: Text(AppLocalizations.of(context).monthlySummary,
+                    style: AppTextStyles.headlineSmall),
               ),
             ),
             SliverToBoxAdapter(child: _MonthlySummary(seniorId: senior.id)),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-                child: Text('Recent Sessions', style: AppTextStyles.headlineSmall),
+                child: Text(AppLocalizations.of(context).recentSessions,
+                    style: AppTextStyles.headlineSmall),
               ),
             ),
             SliverToBoxAdapter(child: _SessionsList(seniorId: senior.id)),
@@ -99,6 +102,7 @@ class _TodayCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final insights = ref.watch(seniorInsightsProvider(senior.id));
     final todayReps = insights.todayReps;
     final goal = senior.dailyRepGoal;
@@ -125,7 +129,7 @@ class _TodayCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Text("Today's Progress", style: AppTextStyles.titleLarge),
+              Text(l.todaysProgress, style: AppTextStyles.titleLarge),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -136,7 +140,7 @@ class _TodayCard extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Live', style: AppTextStyles.caption),
+                    Text(l.live, style: AppTextStyles.caption),
                     const SizedBox(width: 4),
                     Container(
                       width: 6,
@@ -191,10 +195,10 @@ class _TodayCard extends ConsumerWidget {
                         ),
                         Text(
                           progress >= 1.0
-                              ? 'Goal met!'
+                              ? l.goalMet
                               : todayReps == 0
-                                  ? 'Not started'
-                                  : 'Keep going!',
+                                  ? l.notStarted
+                                  : l.keepGoing,
                           style: AppTextStyles.caption
                               .copyWith(color: AppColors.sageGreen),
                         ),
@@ -209,21 +213,22 @@ class _TodayCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _MetricRow(
-                      label: 'Avg. Rep Time',
-                      value: '${insights.avgRepTimeSeconds.toStringAsFixed(1)}s',
+                      label: l.avgRepTime,
+                      value: l.secondsShort(
+                          insights.avgRepTimeSeconds.toStringAsFixed(1)),
                       icon: Icons.timer_outlined,
                     ),
                     const SizedBox(height: 12),
                     _MetricRow(
-                      label: 'vs. yesterday',
-                      value: '$repDiffSign$repDiff reps',
+                      label: l.vsYesterday,
+                      value: '$repDiffSign${l.repsLabel(repDiff)}',
                       icon: repDiff >= 0 ? Icons.trending_up : Icons.trending_down,
                       valueColor: repDiff >= 0 ? AppColors.sageGreen : AppColors.terracotta,
                     ),
                     const SizedBox(height: 12),
                     _MetricRow(
-                      label: 'Daily goal',
-                      value: '${senior.dailyRepGoal} reps',
+                      label: l.dailyGoal,
+                      value: l.repsLabel(senior.dailyRepGoal),
                       icon: Icons.track_changes_outlined,
                     ),
                   ],
@@ -286,12 +291,12 @@ class _MetricRow extends StatelessWidget {
 
 class _WeekCalendar extends ConsumerWidget {
   final String seniorId;
-  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   const _WeekCalendar({required this.seniorId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final insights = ref.watch(seniorInsightsProvider(seniorId));
     final weeklyReps = insights.weeklyReps;
     final activeSet = {
@@ -316,10 +321,11 @@ class _WeekCalendar extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('This Week', style: AppTextStyles.titleLarge),
+          Text(l.thisWeek, style: AppTextStyles.titleLarge),
           const SizedBox(height: 4),
           Text(
-            '${insights.daysActiveThisWeek} of ${insights.daysInWeek} days active',
+            l.daysActiveThisWeek(
+                insights.daysActiveThisWeek, insights.daysInWeek),
             style: AppTextStyles.bodySmall,
           ),
           const SizedBox(height: 16),
@@ -342,7 +348,7 @@ class _WeekCalendar extends ConsumerWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _days[i],
+                    l.weekdayShort(i),
                     style: AppTextStyles.caption.copyWith(
                       color: isActive ? AppColors.sageGreen : AppColors.subtleText,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
@@ -364,6 +370,7 @@ class _MonthlySummary extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final insights = ref.watch(seniorInsightsProvider(seniorId));
     // Use the same consistency metric as the Insights/stats page (active days
     // ÷ days elapsed since the first active day this week) so the two screens
@@ -377,7 +384,7 @@ class _MonthlySummary extends ConsumerWidget {
           Expanded(
             child: _SummaryTile(
               icon: Icons.repeat_outlined,
-              label: 'Total Reps',
+              label: l.totalReps,
               value: '${insights.totalRepsThisMonth}',
             ),
           ),
@@ -385,7 +392,7 @@ class _MonthlySummary extends ConsumerWidget {
           Expanded(
             child: _SummaryTile(
               icon: Icons.calendar_today_outlined,
-              label: 'Consistency',
+              label: l.consistency,
               value: '$consistencyPct%',
             ),
           ),
@@ -393,8 +400,8 @@ class _MonthlySummary extends ConsumerWidget {
           Expanded(
             child: _SummaryTile(
               icon: Icons.speed_outlined,
-              label: 'Avg Speed',
-              value: '${insights.avgRepTimeSeconds.toStringAsFixed(1)}s',
+              label: l.avgSpeed,
+              value: l.secondsShort(insights.avgRepTimeSeconds.toStringAsFixed(1)),
             ),
           ),
         ],
@@ -485,13 +492,13 @@ class _SessionsList extends ConsumerWidget {
                 Icon(Icons.fitness_center_outlined, size: 32, color: AppColors.lightSage),
                 const SizedBox(height: 10),
                 Text(
-                  'No sessions recorded yet',
+                  AppLocalizations.of(context).noSessionsRecorded,
                   style: AppTextStyles.bodySmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sessions will appear here once the mat syncs.',
+                  AppLocalizations.of(context).sessionsWillAppear,
                   style: AppTextStyles.caption,
                   textAlign: TextAlign.center,
                 ),
@@ -517,6 +524,7 @@ class _PlayCodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final code = senior.joinCode!;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
@@ -544,7 +552,7 @@ class _PlayCodeCard extends StatelessWidget {
                   text: TextSpan(
                     style: AppTextStyles.bodySmall,
                     children: [
-                      TextSpan(text: "${senior.name}'s Play Code: "),
+                      TextSpan(text: l.playCodeOf(senior.name)),
                       TextSpan(
                         text: code,
                         style: AppTextStyles.titleMedium.copyWith(
@@ -560,7 +568,7 @@ class _PlayCodeCard extends StatelessWidget {
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: code));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Code copied to clipboard')),
+                    SnackBar(content: Text(l.codeCopied)),
                   );
                 },
                 child: const Icon(Icons.copy_outlined,
@@ -587,7 +595,7 @@ class _PlayCodeCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.nfc, size: 18),
-              label: const Text('Enrol NFC Card'),
+              label: Text(l.enrolNfcCard),
             ),
           ),
         ],
@@ -602,6 +610,7 @@ class _PendingSessionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       padding: const EdgeInsets.all(16),
@@ -637,9 +646,9 @@ class _PendingSessionTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Today', style: AppTextStyles.titleMedium),
+                Text(l.today, style: AppTextStyles.titleMedium),
                 Text(
-                  '${liveSession.repCount} reps  •  syncing…',
+                  l.repsSyncing(liveSession.repCount),
                   style: AppTextStyles.bodySmall,
                 ),
               ],
@@ -652,7 +661,7 @@ class _PendingSessionTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '${liveSession.repCount} reps',
+              l.repsLabel(liveSession.repCount),
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.sageGreen,
                 fontWeight: FontWeight.w600,
@@ -669,15 +678,16 @@ class _SessionTile extends StatelessWidget {
   final SessionLog session;
   const _SessionTile({required this.session});
 
-  String _relativeTime(DateTime ts) {
+  String _relativeTime(AppLocalizations l, DateTime ts) {
     final diff = DateTime.now().difference(ts).inDays;
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Yesterday';
-    return '$diff days ago';
+    if (diff == 0) return l.today;
+    if (diff == 1) return l.yesterday;
+    return l.daysAgo(diff);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       padding: const EdgeInsets.all(16),
@@ -712,9 +722,10 @@ class _SessionTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_relativeTime(session.timestamp), style: AppTextStyles.titleMedium),
+                Text(_relativeTime(l, session.timestamp), style: AppTextStyles.titleMedium),
                 Text(
-                  '${session.repCount} reps  •  avg ${session.avgRepTimeSeconds.toStringAsFixed(1)}s',
+                  l.sessionRepsAvg(session.repCount,
+                      session.avgRepTimeSeconds.toStringAsFixed(1)),
                   style: AppTextStyles.bodySmall,
                 ),
               ],
@@ -727,7 +738,7 @@ class _SessionTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '${session.repCount} reps',
+              l.repsLabel(session.repCount),
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.sageGreen,
                 fontWeight: FontWeight.w600,

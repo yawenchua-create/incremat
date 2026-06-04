@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/senior_provider.dart';
 import '../../services/nfc/nfc_service.dart';
 import '../../services/nfc/nfc_uid_service.dart';
 
@@ -77,6 +79,10 @@ class _NfcWriteSheetState extends ConsumerState<NfcWriteSheet> {
             caregiverId: caregiverId,
           );
           if (mounted) {
+            // Re-tagging a card hands tracking to the newly enrolled senior:
+            // make them the active user so the next session's reps are
+            // credited to them, not whoever was previously selected.
+            selectSenior(ref, widget.seniorId);
             setState(() {
               _state = _EnrollState.success;
               _enrolledUid = uid;
@@ -86,7 +92,7 @@ class _NfcWriteSheetState extends ConsumerState<NfcWriteSheet> {
           if (mounted) {
             setState(() {
               _state = _EnrollState.error;
-              _errorMessage = 'Failed to save card. Please try again.';
+              _errorMessage = AppLocalizations.of(context).nfcSaveFailed;
             });
           }
         }
@@ -128,11 +134,11 @@ class _NfcWriteSheetState extends ConsumerState<NfcWriteSheet> {
             const SizedBox(height: 24),
             _buildIcon(),
             const SizedBox(height: 20),
-            Text(_title,
+            Text(_title(AppLocalizations.of(context)),
                 style: AppTextStyles.headlineSmall,
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
-            Text(_subtitle,
+            Text(_subtitle(AppLocalizations.of(context)),
                 style: AppTextStyles.bodySmall,
                 textAlign: TextAlign.center),
             const SizedBox(height: 28),
@@ -142,14 +148,16 @@ class _NfcWriteSheetState extends ConsumerState<NfcWriteSheet> {
                   setState(() => _state = _EnrollState.waiting);
                   _startEnroll();
                 },
-                child: const Text('Try Again'),
+                child: Text(AppLocalizations.of(context).tryAgain),
               ),
               const SizedBox(height: 12),
             ],
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
-                _state == _EnrollState.success ? 'Done' : 'Cancel',
+                _state == _EnrollState.success
+                    ? AppLocalizations.of(context).done
+                    : AppLocalizations.of(context).cancel,
                 style: AppTextStyles.labelLarge
                     .copyWith(color: AppColors.subtleText),
               ),
@@ -184,26 +192,20 @@ class _NfcWriteSheetState extends ConsumerState<NfcWriteSheet> {
     );
   }
 
-  String get _title => switch (_state) {
-        _EnrollState.waiting => 'Ready to Enrol',
-        _EnrollState.scanning => 'Tap Card to Phone',
-        _EnrollState.success => 'Card Enrolled!',
-        _EnrollState.error => 'Enrolment Failed',
-        _EnrollState.unavailable => 'NFC Not Available',
+  String _title(AppLocalizations l) => switch (_state) {
+        _EnrollState.waiting => l.nfcReadyToEnrol,
+        _EnrollState.scanning => l.nfcTapCardToPhone,
+        _EnrollState.success => l.nfcCardEnrolled,
+        _EnrollState.error => l.nfcEnrolFailed,
+        _EnrollState.unavailable => l.nfcNotAvailableTitle,
       };
 
-  String get _subtitle => switch (_state) {
-        _EnrollState.waiting =>
-          'Hold any NFC card — EZ-Link, access fob, etc. — to the back of the phone.',
-        _EnrollState.scanning =>
-          "Hold ${widget.seniorName}'s card flat against the back of the phone.",
+  String _subtitle(AppLocalizations l) => switch (_state) {
+        _EnrollState.waiting => l.nfcWaitingSubtitle,
+        _EnrollState.scanning => l.nfcScanningSubtitle(widget.seniorName),
         _EnrollState.success =>
-          "${widget.seniorName}'s card has been enrolled. "
-              "They can now tap it on the mat to log in automatically.\n\n"
-              "UID: ${_enrolledUid ?? ''}",
+          l.nfcSuccessSubtitle(widget.seniorName, _enrolledUid ?? ''),
         _EnrollState.error => _errorMessage,
-        _EnrollState.unavailable =>
-          'This device does not have NFC or it is turned off. '
-              'Enable NFC in Settings and try again.',
+        _EnrollState.unavailable => l.nfcUnavailableSubtitle,
       };
 }

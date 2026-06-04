@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/auth_errors.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/hardware_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../auth/login_screen.dart';
@@ -16,13 +18,14 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final senior = ref.watch(selectedSeniorProvider);
     final authState = ref.watch(authNotifierProvider);
 
     ref.listen(authNotifierProvider, (_, next) {
       if (next.hasError && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyAuthError(next.error))),
+          SnackBar(content: Text(friendlyAuthError(l, next.error))),
         );
       }
     });
@@ -33,6 +36,7 @@ class SettingsScreen extends ConsumerWidget {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: const _SettingsHeader()),
+            SliverToBoxAdapter(child: const _LanguageCard()),
             SliverToBoxAdapter(child: _SettingsSeniorSwitcher()),
             if (senior != null) ...[
               SliverToBoxAdapter(child: _RepGoalCard(senior: senior)),
@@ -133,13 +137,101 @@ class _SettingsHeader extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Exercise Settings', style: AppTextStyles.headlineLarge),
+              Text(AppLocalizations.of(context).exerciseSettings,
+                  style: AppTextStyles.headlineLarge),
             ],
           ),
           Positioned(
             right: 0,
             top: -8,
             child: Icon(Icons.eco, size: 52, color: AppColors.lightSage),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LanguageCard extends ConsumerWidget {
+  const _LanguageCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final locale = ref.watch(localeProvider);
+
+    Widget option(String label, String code) {
+      final selected = locale.languageCode == code;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => ref
+              .read(localeProvider.notifier)
+              .setLocale(Locale(code)),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.sageGreen : AppColors.warmCream,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? AppColors.sageGreen : AppColors.divider,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: AppTextStyles.titleMedium.copyWith(
+                  color: selected ? Colors.white : AppColors.subtleText,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.lightSage.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.language,
+                    size: 18, color: AppColors.sageGreen),
+              ),
+              const SizedBox(width: 12),
+              Text(l.language, style: AppTextStyles.titleLarge),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(l.languageSubtitle, style: AppTextStyles.caption),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              option(l.english, 'en'),
+              const SizedBox(width: 12),
+              option(l.chinese, 'zh'),
+            ],
           ),
         ],
       ),
@@ -207,7 +299,8 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
                 child: const Icon(Icons.track_changes_outlined, size: 18, color: AppColors.sageGreen),
               ),
               const SizedBox(width: 12),
-              Text('Daily Rep Goal', style: AppTextStyles.titleLarge),
+              Text(AppLocalizations.of(context).dailyRepGoal,
+                  style: AppTextStyles.titleLarge),
             ],
           ),
           const SizedBox(height: 16),
@@ -215,7 +308,8 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
             child: Column(
               children: [
                 Text('$_goal', style: AppTextStyles.statNumber),
-                Text('reps per day', style: AppTextStyles.bodySmall),
+                Text(AppLocalizations.of(context).repsPerDay,
+                    style: AppTextStyles.bodySmall),
               ],
             ),
           ),
@@ -240,13 +334,14 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
               }),
               onChangeEnd: (v) async {
                 final messenger = ScaffoldMessenger.of(context);
+                final msg = AppLocalizations.of(context).couldNotSaveGoal;
                 try {
                   await ref.read(seniorsNotifierProvider.notifier)
                       .updateGoal(widget.senior.id, v.round());
                 } catch (_) {
                   if (!mounted) return;
                   messenger.showSnackBar(
-                    const SnackBar(content: Text('Could not save goal. Please try again.')),
+                    SnackBar(content: Text(msg)),
                   );
                 }
               },
@@ -325,7 +420,8 @@ class _WeeklyRewardDaysCardState extends ConsumerState<_WeeklyRewardDaysCard> {
                     size: 18, color: AppColors.sageGreen),
               ),
               const SizedBox(width: 12),
-              Text('Weekly Reward Days', style: AppTextStyles.titleLarge),
+              Text(AppLocalizations.of(context).weeklyRewardDays,
+                  style: AppTextStyles.titleLarge),
             ],
           ),
           const SizedBox(height: 16),
@@ -338,6 +434,7 @@ class _WeeklyRewardDaysCardState extends ConsumerState<_WeeklyRewardDaysCard> {
                 onTap: () async {
                   setState(() => _threshold = value);
                   final messenger = ScaffoldMessenger.of(context);
+                  final msg = AppLocalizations.of(context).couldNotSave;
                   try {
                     await ref
                         .read(seniorsNotifierProvider.notifier)
@@ -345,7 +442,7 @@ class _WeeklyRewardDaysCardState extends ConsumerState<_WeeklyRewardDaysCard> {
                   } catch (_) {
                     if (!mounted) return;
                     messenger.showSnackBar(
-                      const SnackBar(content: Text('Could not save. Please try again.')),
+                      SnackBar(content: Text(msg)),
                     );
                   }
                 },
@@ -374,7 +471,8 @@ class _WeeklyRewardDaysCardState extends ConsumerState<_WeeklyRewardDaysCard> {
           ),
           const SizedBox(height: 12),
           Text(
-            '${widget.senior.name} earns an egg in IncreMat Play when the daily goal of $_threshold ${_threshold == 1 ? 'day' : 'days'} a week is met.',
+            AppLocalizations.of(context)
+                .eggRewardExplain(widget.senior.name, _threshold),
             style: AppTextStyles.caption,
           ),
         ],
@@ -391,6 +489,7 @@ class _MusicCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final selectedTrack = ref.watch(selectedTrackProvider(senior.id));
     final randomize = ref.watch(randomizeTracksProvider(senior.id));
 
@@ -429,11 +528,11 @@ class _MusicCard extends ConsumerWidget {
                 child: const Icon(Icons.music_note_outlined, size: 18, color: AppColors.sageGreen),
               ),
               const SizedBox(width: 12),
-              Text('Session Music', style: AppTextStyles.titleLarge),
+              Text(l.sessionMusic, style: AppTextStyles.titleLarge),
             ],
           ),
           const SizedBox(height: 16),
-          Text('Select Track', style: AppTextStyles.labelMedium),
+          Text(l.selectTrack, style: AppTextStyles.labelMedium),
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
@@ -508,7 +607,7 @@ class _MusicCard extends ConsumerWidget {
               Expanded(child: Divider(color: AppColors.divider)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('OR', style: AppTextStyles.caption),
+                child: Text(l.orDivider, style: AppTextStyles.caption),
               ),
               Expanded(child: Divider(color: AppColors.divider)),
             ],
@@ -520,8 +619,8 @@ class _MusicCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Randomize Tracks', style: AppTextStyles.titleMedium),
-                    Text('Play a different mix each session', style: AppTextStyles.caption),
+                    Text(l.randomizeTracks, style: AppTextStyles.titleMedium),
+                    Text(l.randomizeSubtitle, style: AppTextStyles.caption),
                   ],
                 ),
               ),
@@ -564,8 +663,8 @@ class _MusicCard extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Session Player', style: AppTextStyles.titleMedium),
-                        Text('Live layers & playback controls',
+                        Text(l.sessionPlayer, style: AppTextStyles.titleMedium),
+                        Text(l.sessionPlayerSubtitle,
                             style: AppTextStyles.caption),
                       ],
                     ),
@@ -586,15 +685,16 @@ class _NotificationsCard extends ConsumerWidget {
   final Senior senior;
   const _NotificationsCard({required this.senior});
 
-  String _formatTime(TimeOfDay t) {
+  String _formatTime(AppLocalizations l, TimeOfDay t) {
     final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
     final minute = t.minute.toString().padLeft(2, '0');
-    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    final period = t.period == DayPeriod.am ? l.amLabel : l.pmLabel;
     return '$hour:$minute $period';
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final notifAsync = ref.watch(notificationsProvider(senior.id));
     final enabled = notifAsync.valueOrNull ?? false;
     final timeAsync = ref.watch(notificationTimeProvider);
@@ -629,7 +729,7 @@ class _NotificationsCard extends ConsumerWidget {
                 child: const Icon(Icons.notifications_outlined, size: 18, color: AppColors.sageGreen),
               ),
               const SizedBox(width: 12),
-              Text('Daily Reminders', style: AppTextStyles.titleLarge),
+              Text(l.dailyReminders, style: AppTextStyles.titleLarge),
             ],
           ),
           const SizedBox(height: 16),
@@ -639,11 +739,11 @@ class _NotificationsCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Goal Reminder', style: AppTextStyles.titleMedium),
+                    Text(l.goalReminder, style: AppTextStyles.titleMedium),
                     Text(
                       enabled
-                          ? 'Reminder set for ${_formatTime(currentTime)} daily'
-                          : "Notify if daily rep goal isn't met",
+                          ? l.reminderSetFor(_formatTime(l, currentTime))
+                          : l.notifyIfGoalNotMet,
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -702,10 +802,10 @@ class _NotificationsCard extends ConsumerWidget {
                   children: [
                     const Icon(Icons.schedule_outlined, size: 18, color: AppColors.sageGreen),
                     const SizedBox(width: 10),
-                    Text('Reminder Time', style: AppTextStyles.titleMedium),
+                    Text(l.reminderTime, style: AppTextStyles.titleMedium),
                     const Spacer(),
                     Text(
-                      _formatTime(currentTime),
+                      _formatTime(l, currentTime),
                       style: AppTextStyles.titleMedium.copyWith(color: AppColors.sageGreen),
                     ),
                     const SizedBox(width: 4),
@@ -734,6 +834,7 @@ class _AccountSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       decoration: BoxDecoration(
@@ -751,13 +852,13 @@ class _AccountSection extends StatelessWidget {
         children: [
           _SettingsTile(
             icon: Icons.person_outline,
-            label: 'Account',
+            label: l.account,
             onTap: () {},
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
           _SettingsTile(
             icon: Icons.logout,
-            label: isAuthLoading ? 'Signing out…' : 'Sign Out',
+            label: isAuthLoading ? l.signingOut : l.signOut,
             labelColor: AppColors.terracotta,
             iconColor: AppColors.terracotta,
             trailing: isAuthLoading
@@ -775,7 +876,7 @@ class _AccountSection extends StatelessWidget {
           const Divider(height: 1, indent: 20, endIndent: 20),
           _SettingsTile(
             icon: Icons.delete_forever_outlined,
-            label: 'Delete Account',
+            label: l.deleteAccount,
             labelColor: AppColors.terracotta,
             iconColor: AppColors.terracotta,
             onTap: isAuthLoading
@@ -786,22 +887,22 @@ class _AccountSection extends StatelessWidget {
                       context: context,
                       builder: (ctx) => StatefulBuilder(
                         builder: (ctx, setDialogState) => AlertDialog(
-                          title: const Text('Delete Account?'),
+                          title: Text(l.deleteAccountQ),
                           content: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'This permanently removes your account and all care data. Enter your password to confirm.',
+                              Text(
+                                l.deleteAccountWarning,
                               ),
                               const SizedBox(height: 16),
                               TextField(
                                 controller: passwordCtrl,
                                 obscureText: true,
                                 autofocus: true,
-                                decoration: const InputDecoration(
-                                  hintText: 'Password',
-                                  prefixIcon: Icon(Icons.lock_outline,
+                                decoration: InputDecoration(
+                                  hintText: l.password,
+                                  prefixIcon: const Icon(Icons.lock_outline,
                                       size: 18, color: AppColors.subtleText),
                                 ),
                                 onChanged: (_) => setDialogState(() {}),
@@ -811,15 +912,15 @@ class _AccountSection extends StatelessWidget {
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx, null),
-                              child: const Text('Cancel'),
+                              child: Text(l.cancel),
                             ),
                             TextButton(
                               onPressed: passwordCtrl.text.isEmpty
                                   ? null
                                   : () => Navigator.pop(ctx, passwordCtrl.text),
-                              child: const Text(
-                                'Delete',
-                                style: TextStyle(color: AppColors.terracotta),
+                              child: Text(
+                                l.delete,
+                                style: const TextStyle(color: AppColors.terracotta),
                               ),
                             ),
                           ],
