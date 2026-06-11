@@ -12,6 +12,8 @@ class MockHardwareService implements HardwareService {
   final _controller = StreamController<HardwareStatus>.broadcast();
   final _repController = StreamController<int>.broadcast();
   final _speedController = StreamController<double>.broadcast();
+  // No NFC reader in mock — stream never emits.
+  final _nfcController = StreamController<String>.broadcast();
   HardwareStatus _current = _connectedStatus;
 
   MockHardwareService() {
@@ -32,6 +34,9 @@ class MockHardwareService implements HardwareService {
 
   @override
   Stream<double> get avgRepTimeStream => _speedController.stream;
+
+  @override
+  Stream<String> get nfcUidStream => _nfcController.stream;
 
   @override
   HardwareStatus get currentStatus => _current;
@@ -59,5 +64,6 @@ class MockHardwareService implements HardwareService {
     _controller.close();
     _repController.close();
     _speedController.close();
+    _nfcController.close();
   }
 }

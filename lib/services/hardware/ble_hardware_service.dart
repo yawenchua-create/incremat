@@ -11,6 +11,7 @@ class BleHardwareService implements HardwareService {
   final _statusController = StreamController<HardwareStatus>.broadcast();
   final _repController = StreamController<int>.broadcast();
   final _speedController = StreamController<double>.broadcast();
+  final _nfcController = StreamController<String>.broadcast();
 
   HardwareStatus _current = HardwareStatus.disconnected;
 
@@ -19,10 +20,14 @@ class BleHardwareService implements HardwareService {
   StreamSubscription<List<int>>? _matPlacedSub;
   StreamSubscription<List<int>>? _repCountSub;
   StreamSubscription<List<int>>? _repSpeedSub;
+  StreamSubscription<List<int>>? _nfcScanSub;
   Timer? _rssiTimer;
 
   @override
   Stream<HardwareStatus> get statusStream => _statusController.stream;
+
+  @override
+  Stream<String> get nfcUidStream => _nfcController.stream;
 
   @override
   Stream<int> get repCountStream => _repController.stream;
@@ -102,6 +107,9 @@ class BleHardwareService implements HardwareService {
             _matPlacedSub = char.onValueReceived.listen(_onMatPlacedData);
           } else if (uuid == BleConstants.musicTrackCharUuid.toLowerCase()) {
             _musicChar = char;
+          } else if (uuid == BleConstants.nfcScanCharUuid.toLowerCase()) {
+            await char.setNotifyValue(true);
+            _nfcScanSub = char.onValueReceived.listen(_onNfcScanData);
           }
         }
       }
@@ -142,6 +150,13 @@ class BleHardwareService implements HardwareService {
     _statusController.add(_current);
   }
 
+  // NFC_SCAN char — mat sends the tapped card's UID as a UTF-8 hex string.
+  void _onNfcScanData(List<int> data) {
+    if (data.isEmpty) return;
+    final uid = String.fromCharCodes(data).trim().toLowerCase();
+    if (uid.isNotEmpty) _nfcController.add(uid);
+  }
+
   void _onMatPlacedData(List<int> data) {
     if (data.isEmpty) return;
     _current = HardwareStatus(
@@ -175,11 +190,13 @@ class BleHardwareService implements HardwareService {
     _matPlacedSub?.cancel();
     _repCountSub?.cancel();
     _repSpeedSub?.cancel();
+    _nfcScanSub?.cancel();
     _connectionSub = null;
     _batterySub = null;
     _matPlacedSub = null;
     _repCountSub = null;
     _repSpeedSub = null;
+    _nfcScanSub = null;
     await _device?.disconnect();
     _musicChar = null;
     _current = HardwareStatus.disconnected;
@@ -200,9 +217,11 @@ class BleHardwareService implements HardwareService {
     _matPlacedSub?.cancel();
     _repCountSub?.cancel();
     _repSpeedSub?.cancel();
+    _nfcScanSub?.cancel();
     _statusController.close();
     _repController.close();
     _speedController.close();
+    _nfcController.close();
     _device?.disconnect();
   }
 }

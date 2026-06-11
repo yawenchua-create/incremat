@@ -6,6 +6,8 @@ class BleConstants {
   static const String batteryCharUuid   = '4fafc201-1fb5-459e-8fcc-c5c9c3319103';
   static const String matPlacedCharUuid = '4fafc201-1fb5-459e-8fcc-c5c9c3319104';
   static const String musicTrackCharUuid= '4fafc201-1fb5-459e-8fcc-c5c9c3319105';
+  // NFC_SCAN char → notify, UTF-8 lowercase hex UID string sent on each card tap.
+  static const String nfcScanCharUuid   = '4fafc201-1fb5-459e-8fcc-c5c9c3319107';
 
   // ESP32 firmware protocol
   // repCount char  → notify, 2 bytes little-endian uint16 = cumulative reps this session

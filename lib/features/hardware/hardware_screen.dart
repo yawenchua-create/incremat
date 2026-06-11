@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
@@ -355,6 +357,55 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
   bool _scanning = false;
   String? _statusMsg;
   bool _isError = false;
+  StreamSubscription<String>? _matNfcSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Subscribe to UIDs from the mat's NFC reader so a card tap there
+    // auto-identifies the user, identical to tapping the phone manually.
+    final service = ref.read(hardwareServiceProvider);
+    _matNfcSub = service.nfcUidStream.listen(_onMatUid);
+  }
+
+  Future<void> _onMatUid(String uid) async {
+    if (!mounted) return;
+    setState(() { _statusMsg = null; _isError = false; });
+    await _resolveUid(uid);
+  }
+
+  /// Shared lookup used by both the phone's NFC reader and the mat's reader.
+  Future<void> _resolveUid(String uid) async {
+    // Capture localizations before the await so we don't use context across
+    // an async gap.
+    final l = AppLocalizations.of(context);
+    final seniorId = await NfcUidService().lookup(uid);
+    if (!mounted) return;
+    if (seniorId == null) {
+      setState(() {
+        _scanning = false;
+        _statusMsg = l.cardNotRecognised;
+        _isError = true;
+      });
+      return;
+    }
+    final seniors = ref.read(seniorsProvider);
+    final match = seniors.where((s) => s.id == seniorId).firstOrNull;
+    if (match == null) {
+      setState(() {
+        _scanning = false;
+        _statusMsg = l.userNotInCircle;
+        _isError = true;
+      });
+      return;
+    }
+    selectSenior(ref, seniorId);
+    setState(() {
+      _scanning = false;
+      _statusMsg = l.nowTracking(match.name);
+      _isError = false;
+    });
+  }
 
   Future<void> _identify() async {
     final l = AppLocalizations.of(context);
@@ -368,34 +419,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
     }
     setState(() { _scanning = true; _statusMsg = null; _isError = false; });
     await NfcService.readUid(
-      onRead: (uid) async {
-        final seniorId = await NfcUidService().lookup(uid);
-        if (!mounted) return;
-        if (seniorId == null) {
-          setState(() {
-            _scanning = false;
-            _statusMsg = l.cardNotRecognised;
-            _isError = true;
-          });
-          return;
-        }
-        final seniors = ref.read(seniorsProvider);
-        final match = seniors.where((s) => s.id == seniorId).firstOrNull;
-        if (match == null) {
-          setState(() {
-            _scanning = false;
-            _statusMsg = l.userNotInCircle;
-            _isError = true;
-          });
-          return;
-        }
-        selectSenior(ref, seniorId);
-        setState(() {
-          _scanning = false;
-          _statusMsg = l.nowTracking(match.name);
-          _isError = false;
-        });
-      },
+      onRead: (uid) => _resolveUid(uid),
       onError: (msg) {
         if (mounted) {
           setState(() { _scanning = false; _statusMsg = msg; _isError = true; });
@@ -406,6 +430,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
 
   @override
   void dispose() {
+    _matNfcSub?.cancel();
     NfcService.stopSession().ignore();
     super.dispose();
   }

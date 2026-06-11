@@ -30,6 +30,8 @@ abstract class HardwareService {
   Stream<int> get repCountStream;
   // Emits avg rep time (seconds) updated after each rep.
   Stream<double> get avgRepTimeStream;
+  // Emits lowercase-hex UID strings whenever the mat's NFC reader scans a card.
+  Stream<String> get nfcUidStream;
   HardwareStatus get currentStatus;
   Future<void> connect(String deviceId);
   Future<void> disconnect();
