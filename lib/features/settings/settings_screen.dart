@@ -12,6 +12,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../auth/login_screen.dart';
 import '../session_music/session_music_screen.dart';
+import 'user_guide_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -850,6 +851,14 @@ class _AccountSection extends StatelessWidget {
       ),
       child: Column(
         children: [
+          _SettingsTile(
+            icon: Icons.menu_book_outlined,
+            label: l.userGuide,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const UserGuideScreen()),
+            ),
+          ),
+          const Divider(height: 1, indent: 20, endIndent: 20),
           _SettingsTile(
             icon: Icons.person_outline,
             label: l.account,

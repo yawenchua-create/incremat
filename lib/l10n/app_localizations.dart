@@ -423,6 +423,59 @@ class AppLocalizations {
   String get deleteAccountWarning => _t(
       'This permanently removes your account and all care data. Enter your password to confirm.',
       '这将永久删除您的账户和所有护理数据。请输入密码确认。');
+
+  // ── User guide ───────────────────────────────────────────────────────────────
+  String get userGuide => _t('User Guide', '使用指南');
+  String get userGuideSubtitle =>
+      _t('How to set up and use IncreMat', '如何设置和使用 IncreMat');
+  String get guideHeader => _t('Getting Started', '快速上手');
+  String get guideIntro => _t(
+      'IncreMat helps you support a loved one\'s daily exercise. Here\'s how each part works.',
+      'IncreMat 帮助您支持家人的每日锻炼。以下是各部分的使用方法。');
+
+  String get guideAddTitle => _t('1. Add your loved one', '1. 添加您的家人');
+  String get guideAddBody => _t(
+      'On the Home tab, tap "Add loved one" and enter their name and daily goal. Each person gets their own profile, progress, and pet.',
+      '在"主页"标签中，点按"添加家人"并输入姓名和每日目标。每个人都有自己的档案、进度和宠物。');
+
+  String get guidePlayCodeTitle =>
+      _t('2. Share the play code — privately', '2. 私下分享 Play 代码');
+  String get guidePlayCodeBody => _t(
+      'Each loved one has a play code used to sign in to the IncreMat Play app on their phone. Treat it like a password: it is a login credential. Share it directly with that person only — never post it where others can see it.',
+      '每位家人都有一个 Play 代码，用于在他们手机上的 IncreMat Play 应用登录。请像对待密码一样对待它：这是登录凭证。仅直接分享给本人，切勿公开张贴。');
+
+  String get guideMatTitle => _t('3. Connect the mat', '3. 连接锻炼垫');
+  String get guideMatBody => _t(
+      'Open the Hardware tab and tap Connect to pair the mat over Bluetooth. Stay nearby while connecting. Once linked, reps from the mat appear live and are saved automatically.',
+      '打开"设备"标签并点按"连接"，通过蓝牙配对锻炼垫。连接时请保持靠近。连接后，垫子的次数会实时显示并自动保存。');
+
+  String get guideNfcTitle => _t('4. Set up NFC cards', '4. 设置 NFC 卡');
+  String get guideNfcBody => _t(
+      'You can link a tap card to a loved one so they sign in by tapping it. Use "Write card" on a profile, or tap a card on the mat\'s reader to identify who is exercising.',
+      '您可以为家人关联一张感应卡，他们只需轻触即可登录。在档案中使用"写入卡片"，或在垫子的读卡器上轻触卡片以识别正在锻炼的人。');
+
+  String get guideGoalsTitle =>
+      _t('5. Goals, rewards & reminders', '5. 目标、奖励与提醒');
+  String get guideGoalsBody => _t(
+      'In Settings, set the daily rep goal, choose how many days a week earns a reward egg, pick session music, and turn on a daily reminder if the goal isn\'t met.',
+      '在"设置"中，设定每日次数目标，选择每周达成几天可获得奖励蛋，挑选锻炼音乐，并可在未达标时开启每日提醒。');
+
+  String get guideTogetherTitle =>
+      _t('6. Exercise together', '6. 一起锻炼');
+  String get guideTogetherBody => _t(
+      'In the Play app, two people can work out at once — either teaming up so their reps add together, or competing in a friendly race. They pair with a short match code, not their play code.',
+      '在 Play 应用中，两人可以同时锻炼 — 可以组队让次数相加，也可以进行友好比拼。他们使用一个简短的比赛代码配对，而不是 Play 代码。');
+
+  String get guideReportsTitle =>
+      _t('7. Track progress', '7. 追踪进度');
+  String get guideReportsBody => _t(
+      'The Insights tab shows trends over time, and the Reports tab lets you export a summary to share with a doctor or family.',
+      '"洞察"标签显示长期趋势，"报告"标签可让您导出摘要，与医生或家人分享。');
+
+  String get guideHelpTitle => _t('Need more help?', '需要更多帮助？');
+  String get guideHelpBody => _t(
+      'If the mat won\'t connect, make sure Bluetooth is on and the mat is powered, then reopen the Hardware tab. Your data syncs automatically when you\'re back online.',
+      '如果锻炼垫无法连接，请确保蓝牙已开启且垫子已通电，然后重新打开"设备"标签。重新联网后，您的数据会自动同步。');
 }
 
 class _AppLocalizationsDelegate
