@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/senior.dart';
+import '../core/utils/rep_segmenter.dart';
 import 'hardware_provider.dart';
 import 'senior_provider.dart';
 import 'auth_provider.dart';
@@ -10,19 +10,30 @@ class LiveSession {
   final DateTime startedAt;
   final int repCount;
   final double avgRepTimeSeconds;
+  // Seconds elapsed from the 1st to the 5th rep — the on-mat 5XSST proxy.
+  // 0 until the 5th rep of this session lands.
+  final double firstFiveRepsSeconds;
 
   const LiveSession({
     required this.seniorId,
     required this.startedAt,
     required this.repCount,
     required this.avgRepTimeSeconds,
+    this.firstFiveRepsSeconds = 0.0,
   });
 
-  LiveSession copyWith({int? repCount, double? avgRepTimeSeconds}) => LiveSession(
+  LiveSession copyWith({
+    int? repCount,
+    double? avgRepTimeSeconds,
+    double? firstFiveRepsSeconds,
+  }) =>
+      LiveSession(
         seniorId: seniorId,
         startedAt: startedAt,
         repCount: repCount ?? this.repCount,
         avgRepTimeSeconds: avgRepTimeSeconds ?? this.avgRepTimeSeconds,
+        firstFiveRepsSeconds:
+            firstFiveRepsSeconds ?? this.firstFiveRepsSeconds,
       );
 }
 
@@ -31,28 +42,23 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
   StreamSubscription<double>? _speedSub;
   Timer? _flushTimer;
 
-  // The mat's rep counter is a single running total that does NOT reset on an
-  // NFC tap — only on disconnect. So we segment it ourselves:
-  //   _lastCumulative = the latest raw count from the mat.
-  //   _baseline       = the raw count when the current user's session started.
-  //   this user's reps = _lastCumulative - _baseline.
-  // When the active senior changes (NFC tap / manual switch) we finalize the
-  // previous person's session and move the baseline to the current count, so
-  // the next reps count from zero for the new user.
-  int _lastCumulative = 0;
-  int _baseline = 0;
+  // Turns the mat's single cumulative counter into per-session reps (see
+  // RepSegmenter for the edge-case handling). Recreated on every build.
+  RepSegmenter _segmenter = RepSegmenter();
 
   @override
   LiveSession? build() {
     final service = ref.watch(hardwareServiceProvider);
     _repSub?.cancel();
     _speedSub?.cancel();
+    _segmenter = RepSegmenter();
     _repSub = service.repCountStream.listen(_onRep);
     _speedSub = service.avgRepTimeStream.listen(_onSpeed);
 
-    // Segment the rep stream whenever the person on the mat changes.
-    ref.listen<Senior?>(selectedSeniorProvider, (prev, next) {
-      if (prev?.id != next?.id) _onUserSwitch(next?.id);
+    // Only an explicit "who's on the mat" signal (an NFC tap) switches the
+    // attributed senior — never merely viewing another profile.
+    ref.listen<String?>(activeExerciserIdProvider, (prev, next) {
+      if (prev != next && next != null) _onUserSwitch(next);
     });
 
     ref.onDispose(() {
@@ -64,19 +70,27 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
   }
 
   void _onRep(int cumulativeCount) {
-    // Counter went backwards → mat reset (reconnect). Re-baseline from zero.
-    if (cumulativeCount < _lastCumulative) _baseline = 0;
-    _lastCumulative = cumulativeCount;
-    if (cumulativeCount == 0) return;
+    // Don't log reps performed during an in-progress chair-stand test; resume
+    // normal counting from here once it finishes.
+    if (ref.read(chairStandTestActiveProvider)) {
+      _segmenter.establish(cumulativeCount);
+      return;
+    }
 
-    final seniorId = ref.read(selectedSeniorProvider)?.id;
-    if (seniorId == null) return;
-
-    final reps = cumulativeCount - _baseline;
+    final reps = _segmenter.onCount(cumulativeCount);
     if (reps <= 0) return;
 
+    // Attribution is locked for the life of a session: keep the current
+    // session's senior; only at session start do we pick the active exerciser
+    // (NFC) or, failing that, the senior being viewed.
     final current = state;
-    if (current == null || current.seniorId != seniorId) {
+    final seniorId = current?.seniorId ??
+        ref.read(activeExerciserIdProvider) ??
+        ref.read(selectedSeniorProvider)?.id;
+    if (seniorId == null) return;
+
+    if (current == null) {
+      // startedAt marks the first rep; the 5-rep time is measured against it.
       state = LiveSession(
         seniorId: seniorId,
         startedAt: DateTime.now(),
@@ -84,14 +98,23 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
         avgRepTimeSeconds: 0.0,
       );
     } else {
-      state = current.copyWith(repCount: reps);
+      var updated = current.copyWith(repCount: reps);
+      // Capture the 5XSST proxy the instant the 5th rep of this session lands.
+      if (updated.firstFiveRepsSeconds == 0 && reps >= 5) {
+        final secs =
+            DateTime.now().difference(updated.startedAt).inMilliseconds /
+                1000.0;
+        if (secs > 0) updated = updated.copyWith(firstFiveRepsSeconds: secs);
+      }
+      state = updated;
     }
     _resetFlushTimer();
     _publishLive();
   }
 
-  /// Called the instant the active senior changes. Finalizes the outgoing
-  /// person's session and rebaselines so the new person's reps start at zero.
+  /// Called when the active exerciser changes (an NFC tap on the mat).
+  /// Finalizes the outgoing person's session and rebaselines so the new
+  /// person's reps start at zero.
   void _onUserSwitch(String? newSeniorId) {
     final current = state;
     if (current != null && current.seniorId != newSeniorId) {
@@ -100,7 +123,7 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
       state = null;
       _finalizeSession(current);
     }
-    _baseline = _lastCumulative;
+    _segmenter.establish();
   }
 
   /// Mirrors the live rep count to Firestore so the play app can show it in
@@ -136,7 +159,10 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
     // Clear live state now; persist the completed record afterwards.
     state = null;
     // A new session after this idle gap should start counting from zero.
-    _baseline = _lastCumulative;
+    _segmenter.establish();
+    // An NFC tap attributes only the current session; once it ends by idle,
+    // defer back to the selected senior for the next one.
+    ref.read(activeExerciserIdProvider.notifier).state = null;
     await _finalizeSession(current);
   }
 
@@ -146,12 +172,15 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
     final repo = ref.read(sessionRepositoryProvider(session.seniorId));
     if (repo == null) return;
     try {
-      if (session.repCount > 0 &&
-          ref.read(authStateProvider).valueOrNull != null) {
+      final uid = ref.read(authStateProvider).valueOrNull?.uid;
+      if (session.repCount > 0 && uid != null) {
         await repo
             .add(
               repCount: session.repCount,
               avgRepTimeSeconds: session.avgRepTimeSeconds,
+              firstFiveRepsSeconds: session.firstFiveRepsSeconds,
+              source: 'mat',
+              recordedBy: uid,
             )
             .timeout(const Duration(seconds: 8));
       }

@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/utils/chair_stand.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/senior_provider.dart';
 import 'senior_added_screen.dart';
+import 'sex_selector.dart';
 
 class AddLovedOneScreen extends ConsumerStatefulWidget {
   const AddLovedOneScreen({super.key});
@@ -20,6 +22,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
   final _nameCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
   final _goalCtrl = TextEditingController(text: '25');
+  Sex _sex = Sex.unspecified;
   bool _isPairing = false;
   bool _paired = false;
   bool _isSaving = false;
@@ -52,6 +55,7 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
           await ref.read(seniorsNotifierProvider.notifier).addSenior(
                 name: name,
                 age: int.parse(_ageCtrl.text.trim()),
+                sex: _sex,
                 dailyRepGoal: int.parse(_goalCtrl.text.trim()),
               );
       seniorId = result?.seniorId;
@@ -158,6 +162,11 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
+                SexSelector(
+                  value: _sex,
+                  onChanged: (s) => setState(() => _sex = s),
+                ),
+                const SizedBox(height: 12),
                 _FormField(
                   controller: _goalCtrl,
                   hint: l.dailyRepGoal,
@@ -166,7 +175,9 @@ class _AddLovedOneScreenState extends ConsumerState<AddLovedOneScreen> {
                   validator: (v) {
                     if (v == null || v.isEmpty) return l.enterAGoal;
                     final goal = int.tryParse(v);
-                    if (goal == null || goal < 5 || goal > 50) {
+                    if (goal == null ||
+                        goal < ChairStand.goalMin ||
+                        goal > ChairStand.goalMax) {
                       return l.goalBetween;
                     }
                     return null;

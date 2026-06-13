@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/utils/chair_stand.dart';
 import '../../models/senior.dart';
 import 'join_code_service.dart';
 
@@ -95,6 +96,7 @@ class SeniorRepository {
   Future<({String seniorId, String joinCode})> add({
     required String name,
     required int age,
+    required Sex sex,
     required int dailyRepGoal,
   }) async {
     final docRef = _seniorsCol.doc();
@@ -111,6 +113,7 @@ class SeniorRepository {
       id: seniorId,
       name: name,
       age: age,
+      sex: sex,
       dailyRepGoal: dailyRepGoal,
       consistencyThreshold: 4,
       joinCode: joinCode,
@@ -139,8 +142,33 @@ class SeniorRepository {
     await _seniorsCol.doc(seniorId).update({'dailyRepGoal': newGoal});
   }
 
-  Future<void> update(String seniorId, {required String name, required int age}) async {
-    await _seniorsCol.doc(seniorId).update({'name': name, 'age': age});
+  /// Records a 30-Second Chair Stand Test result on the senior document.
+  /// Optionally applies a new daily rep goal in the same write (used when the
+  /// caregiver accepts the recommended starting goal).
+  Future<void> recordChairStandTest(
+    String seniorId,
+    int reps, {
+    int? newGoal,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _seniorsCol.doc(seniorId).update({
+      'chairStandReps': reps,
+      'chairStandTestAt': now,
+      'dailyRepGoal': ?newGoal,
+      // Append to the history array for the monthly trend.
+      'chairStandHistory': FieldValue.arrayUnion([
+        {'reps': reps, 'at': now}
+      ]),
+    });
+  }
+
+  Future<void> update(String seniorId,
+      {required String name, required int age, Sex? sex}) async {
+    await _seniorsCol.doc(seniorId).update({
+      'name': name,
+      'age': age,
+      'sex': ?sex?.name,
+    });
   }
 
   Future<void> updateConsistencyThreshold(String seniorId, int threshold) async {

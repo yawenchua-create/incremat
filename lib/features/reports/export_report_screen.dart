@@ -93,10 +93,16 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
     final espressoColor = PdfColor.fromHex('3E3636');
     final creamColor = PdfColor.fromHex('F7F3F0');
 
-    final totalReps = insights?.totalRepsThisMonth ?? 0;
-    final daysActive = insights?.daysActiveThisMonth ?? 0;
-    final totalDays = insights?.totalDaysThisMonth ?? 1;
-    final avgRepTime = insights?.avgRepTimeSeconds ?? 0.0;
+    final stats = senior != null
+        ? await ref
+            .read(reportStatsProvider((senior.id, _startDate, _endDate)).future)
+        : ReportStats.empty;
+    final totalReps = stats.totalReps;
+    final daysActive = stats.activeDays;
+    final totalDays = stats.totalDays;
+    final avgRepTime = stats.avgRepTimeSeconds;
+    final fiveRepTime = insights?.latestFiveRepSeconds ?? 0.0;
+    final chairStandReps = senior?.chairStandReps;
     final weeklyReps = insights?.weeklyReps ?? [];
 
     doc.addPage(
@@ -158,6 +164,30 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
               label: l.sitToStandSpeed,
               value: '${avgRepTime.toStringAsFixed(1)}s',
               sub: l.avgRepTimeThisMonth,
+              sageColor: sageColor,
+              espressoColor: espressoColor,
+            ),
+            pw.Divider(color: PdfColor.fromHex('E8E3DF')),
+            _pdfStatRow(
+              notoFont: notoFont,
+              notoFontBold: notoFontBold,
+              label: l.fiveRepReportLabel,
+              value: fiveRepTime > 0
+                  ? '${fiveRepTime.toStringAsFixed(1)}s'
+                  : l.notMeasured,
+              sub: l.fiveRepReportSub,
+              sageColor: sageColor,
+              espressoColor: espressoColor,
+            ),
+            pw.Divider(color: PdfColor.fromHex('E8E3DF')),
+            _pdfStatRow(
+              notoFont: notoFont,
+              notoFontBold: notoFontBold,
+              label: l.chairStandReportLabel,
+              value: chairStandReps != null
+                  ? l.chairStandStandsValue(chairStandReps)
+                  : l.notMeasured,
+              sub: l.chairStandReportSub,
               sageColor: sageColor,
               espressoColor: espressoColor,
             ),
@@ -252,10 +282,18 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
         ? ref.watch(seniorInsightsProvider(senior.id))
         : null;
 
-    final totalReps = insights?.totalRepsThisMonth ?? 0;
-    final daysActive = insights?.daysActiveThisMonth ?? 0;
-    final totalDays = insights?.totalDaysThisMonth ?? 1;
-    final avgRepTime = insights?.avgRepTimeSeconds ?? 0.0;
+    final stats = senior != null
+        ? (ref
+                .watch(reportStatsProvider((senior.id, _startDate, _endDate)))
+                .valueOrNull ??
+            ReportStats.empty)
+        : ReportStats.empty;
+    final totalReps = stats.totalReps;
+    final daysActive = stats.activeDays;
+    final totalDays = stats.totalDays;
+    final avgRepTime = stats.avgRepTimeSeconds;
+    final fiveRepTime = insights?.latestFiveRepSeconds ?? 0.0;
+    final chairStandReps = senior?.chairStandReps;
     final weeklyReps = insights?.weeklyReps ?? [];
 
     return Scaffold(
@@ -337,6 +375,24 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
                               label: l.sitToStandSpeed,
                               value: '${avgRepTime.toStringAsFixed(1)}s',
                               sub: l.avgRepTimeThisMonth,
+                            ),
+                            const Divider(),
+                            _ReportRow(
+                              icon: Icons.accessibility_new_outlined,
+                              label: l.fiveRepReportLabel,
+                              value: fiveRepTime > 0
+                                  ? '${fiveRepTime.toStringAsFixed(1)}s'
+                                  : l.notMeasured,
+                              sub: l.fiveRepReportSub,
+                            ),
+                            const Divider(),
+                            _ReportRow(
+                              icon: Icons.event_seat_outlined,
+                              label: l.chairStandReportLabel,
+                              value: chairStandReps != null
+                                  ? l.chairStandStandsValue(chairStandReps)
+                                  : l.notMeasured,
+                              sub: l.chairStandReportSub,
                             ),
                             const SizedBox(height: 20),
                             Text(l.weeklyRepetitions, style: AppTextStyles.titleMedium),

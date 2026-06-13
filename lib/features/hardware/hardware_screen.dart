@@ -399,7 +399,10 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
       });
       return;
     }
+    // An NFC tap on the mat is an authoritative "this person is on the mat now"
+    // signal: switch both the view and the rep-attribution to them.
     selectSenior(ref, seniorId);
+    ref.read(activeExerciserIdProvider.notifier).state = seniorId;
     setState(() {
       _scanning = false;
       _statusMsg = l.nowTracking(match.name);

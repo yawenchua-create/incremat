@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/utils/chair_stand.dart';
 import '../l10n/app_localizations.dart';
 import '../models/senior.dart';
 import '../models/session_log.dart';
@@ -56,6 +57,16 @@ void selectSenior(WidgetRef ref, String seniorId) {
   ref.read(_selectedSeniorIdProvider.notifier).state = seniorId;
 }
 
+// Who is physically on the mat right now (drives rep attribution), set ONLY by
+// a real signal — an NFC tap on the mat — never by merely viewing a profile.
+// null = no explicit signal yet; attribution then falls back to the selected
+// senior at the moment a session starts, and locks for that session.
+final activeExerciserIdProvider = StateProvider<String?>((ref) => null);
+
+// True while a 30-Second Chair Stand Test is running, so the normal live-session
+// pipeline ignores those reps instead of logging them as everyday exercise.
+final chairStandTestActiveProvider = StateProvider<bool>((ref) => false);
+
 // Recent sessions stream per senior.
 final recentSessionsProvider =
     StreamProvider.family<List<SessionLog>, String>((ref, seniorId) {
@@ -77,6 +88,16 @@ final monthlySessionsProvider =
   return repo.watchSince(since);
 });
 
+// Sessions over the last 28 days — the window the mobility (5-rep) alert
+// analysis needs for day-over-day and week-over-week comparisons.
+final mobilityWindowSessionsProvider =
+    StreamProvider.family<List<SessionLog>, String>((ref, seniorId) {
+  final repo = ref.watch(sessionRepositoryProvider(seniorId));
+  if (repo == null) return Stream.value([]);
+  final since = DateTime.now().subtract(const Duration(days: 28));
+  return repo.watchSince(since);
+});
+
 // Music track selection per senior (keyed by senior id).
 final selectedTrackProvider =
     StateProvider.family<String?, String>((ref, _) => null);
@@ -93,27 +114,42 @@ class SeniorsNotifier extends Notifier<void> {
   Future<({String seniorId, String joinCode})?> addSenior({
     required String name,
     required int age,
+    required Sex sex,
     required int dailyRepGoal,
   }) async {
     final repo = ref.read(seniorRepositoryProvider);
     if (repo == null) return null;
-    return await repo.add(name: name, age: age, dailyRepGoal: dailyRepGoal);
+    return await repo.add(
+        name: name, age: age, sex: sex, dailyRepGoal: dailyRepGoal);
   }
 
   Future<void> updateSenior(
     String seniorId, {
     required String name,
     required int age,
+    Sex? sex,
   }) async {
     final repo = ref.read(seniorRepositoryProvider);
     if (repo == null) return;
-    await repo.update(seniorId, name: name, age: age);
+    await repo.update(seniorId, name: name, age: age, sex: sex);
   }
 
   Future<void> updateGoal(String seniorId, int newGoal) async {
     final repo = ref.read(seniorRepositoryProvider);
     if (repo == null) return;
     await repo.updateGoal(seniorId, newGoal);
+  }
+
+  /// Saves a 30-Second Chair Stand Test result; if [newGoal] is given it also
+  /// applies that as the daily rep goal in the same write.
+  Future<void> recordChairStandTest(
+    String seniorId,
+    int reps, {
+    int? newGoal,
+  }) async {
+    final repo = ref.read(seniorRepositoryProvider);
+    if (repo == null) return;
+    await repo.recordChairStandTest(seniorId, reps, newGoal: newGoal);
   }
 
   Future<void> updateConsistencyThreshold(String seniorId, int threshold) async {

@@ -145,7 +145,10 @@ class AppLocalizations {
   String get dailyRepGoal => _t('Daily Rep Goal', '每日目标次数');
   String get enterAGoal => _t('Enter a goal', '请输入目标');
   String get goalBetween =>
-      _t('Enter a goal between 5 and 50', '请输入 5 到 50 之间的目标');
+      _t('Enter a goal between 5 and 100', '请输入 5 到 100 之间的目标');
+  String get sexLabel => _t('Sex (for fitness norms)', '性别（用于体能参照）');
+  String get male => _t('Male', '男');
+  String get female => _t('Female', '女');
   String get incrematPaired => _t('IncreMat Paired', 'IncreMat 已配对');
   String get pairIncreMat => _t('Pair IncreMat', '配对 IncreMat');
   String get connectedSuccessfully => _t('Connected successfully', '连接成功');
@@ -279,16 +282,17 @@ class AppLocalizations {
       _t('Mobility & Exercise Report', '活动与锻炼报告');
   String reportMeta(String name, String range) =>
       _t('IncreMat Data  •  $name  •  $range', 'IncreMat 数据  •  $name  •  $range');
-  String get totalRepsThisMonth => _t('Total Reps this Month', '本月总次数');
-  String get totalRepetitions => _t('Total Repetitions', '总重复次数');
+  String get totalRepsThisMonth => _t('Total Repetitions', '总次数');
+  String get totalRepetitions => _t('In the selected period', '所选时间段内');
   String get dailyConsistency => _t('Daily Consistency', '每日坚持度');
   String get daysWithIncreMat => _t('Days with IncreMat', '使用 IncreMat 的天数');
   String pdfDaysWithIncreMat(int a, int b) => _t(
       'Days with IncreMat  •  $a/$b days', '使用 IncreMat 的天数  •  $b 天中 $a 天');
   String get sitToStandSpeed => _t('Sit-to-Stand Speed', '起坐速度');
   String get avgRepTimeThisMonth =>
-      _t('Average rep time this month', '本月平均每次时长');
-  String get weeklyRepetitions => _t('Weekly Repetitions', '每周重复次数');
+      _t('Average time per rep', '平均每次时长');
+  String get weeklyRepetitions =>
+      _t('This week\'s repetitions', '本周重复次数');
   String get daysWord => _t('days', '天');
   String dayN(int n) => _t('Day $n', '第 $n 天');
   String get selectDateRange => _t('Select Date Range', '选择日期范围');
@@ -476,6 +480,131 @@ class AppLocalizations {
   String get guideHelpBody => _t(
       'If the mat won\'t connect, make sure Bluetooth is on and the mat is powered, then reopen the Hardware tab. Your data syncs automatically when you\'re back online.',
       '如果锻炼垫无法连接，请确保蓝牙已开启且垫子已通电，然后重新打开"设备"标签。重新联网后，您的数据会自动同步。');
+
+  // ── Everyday sit-to-stand pace (personal trend, NOT a clinical test) ──────────
+  String get fiveRepTitle => _t('Sit-to-Stand Pace', '坐立节奏');
+  String get fiveRepSubtitle => _t('Everyday 5-rep time', '日常五次用时');
+  String get fiveRepStatTitle => _t('Sit-to-Stand Pace', '坐立节奏');
+  String get fiveRepStatSubtitle => _t('Everyday 5-rep time', '日常五次用时');
+  String get fiveRepLabel => _t('5-rep pace', '五次节奏');
+  String get doFiveReps =>
+      _t('No reps recorded yet', '尚无记录');
+  String get fiveRepExplain => _t(
+      'Their usual time to do 5 sit-to-stands during everyday sessions. Lower is faster. This is a day-to-day trend, not a clinical test.',
+      '他们在日常锻炼中完成五次起坐的常见用时。越短越快。这是日常趋势，并非临床测试。');
+
+  // Mobility decline alert (shown to the caregiver)
+  String get mobilityAlertHeading => _t('Mobility check-in', '行动力提醒');
+  String mobilityDayDrop(String name, int pct) => _t(
+      "$name's sit-to-stand was $pct% slower than usual today. It may be worth checking in on them.",
+      '$name 今天的坐立速度比平时慢了 $pct%，建议关心一下。');
+  String mobilityWeekDrop(String name, int pct) => _t(
+      "$name's sit-to-stand has slowed $pct% this week. It may be worth checking in on them.",
+      '$name 本周的坐立速度下降了 $pct%，建议关心一下。');
+
+  // Manual session entry
+  String get firstFiveTimeOptional =>
+      _t('Time for first 5 reps (sec, optional)', '前五次用时（秒，可选）');
+  String get enterValidTimeOptional =>
+      _t('Enter a valid time, or leave blank', '请输入有效时间，或留空');
+
+  // Report (PDF) — everyday pace row (clearly NOT the clinical test)
+  String get fiveRepReportLabel =>
+      _t('Everyday Sit-to-Stand Pace', '日常坐立节奏');
+  String get fiveRepReportSub => _t(
+      'Typical time for 5 reps in sessions (not a clinical test)',
+      '锻炼中完成五次的常见用时（非临床测试）');
+  String get notMeasured => _t('Not recorded', '无记录');
+
+  // ── 30-Second Chair Stand Test (30CST) ───────────────────────────────────────
+  String get chairStandTitle => _t('30-Second Chair Stand', '30 秒坐立测试');
+  String get chairStandIntroTitle => _t('Fitness check', '体能检测');
+  String get chairStandIntroSubtitle => _t(
+      'Count how many times they can stand up and sit down in 30 seconds. It gives a general guide to leg strength.',
+      '记录他们在 30 秒内能起立并坐下多少次。用于大致评估腿部力量。');
+  String get chairStandStep1 => _t(
+      'Use a standard, stable chair (about knee height, no armrests, against a wall). Sit in the middle, feet flat, arms crossed over the chest.',
+      '使用标准稳固的椅子（约膝盖高度、无扶手、靠墙）。坐在中间，双脚踏平，双臂交叉抱胸。');
+  String get chairStandStep2 => _t(
+      'On "start", stand up fully then sit back down, as many times as possible.',
+      '听到"开始"后，完全站起再坐下，尽可能多做几次。');
+  String get chairStandStep3 => _t(
+      'Tap the button each time they fully stand up.',
+      '他们每完全站起一次，就点按一下按钮。');
+  String get chairStandStep4 => _t(
+      'Keep going for the full 30 seconds — it stops automatically.',
+      '坚持完整的 30 秒 — 时间到会自动停止。');
+  String get chairStandSafety => _t(
+      'Stop if they feel pain or dizzy. Stay close in case they need support.',
+      '如出现疼痛或头晕请立即停止。请在旁守护以便随时搀扶。');
+  String get chairStandDisclaimer => _t(
+      'This is a general screening guide, not a medical diagnosis. The result can vary with chair height and setup. Share any concerns with a doctor.',
+      '这是一般性筛查参考，并非医疗诊断。结果可能因椅子高度和设置而异。如有疑虑请咨询医生。');
+  String get recommendedGoalNote =>
+      _t('A starting suggestion — adjust anytime in Settings.',
+          '起始建议 — 可随时在设置中调整。');
+  String goalAboveCapacity(int recommended) => _t(
+      'This is well above the goal suggested by their last fitness test (about $recommended). Consider easing in to avoid overexertion.',
+      '这远高于上次体能测试建议的目标（约 $recommended）。建议循序渐进，避免过度运动。');
+  String get startTest => _t('Start test', '开始测试');
+  String get secondsLeftUnit => _t('sec left', '秒剩余');
+  String get standsCounted => _t('stands', '次');
+  String get tapEachStand => _t('Tap each time they stand', '每次站起点按一下');
+  String get countFromMat => _t('Count from the mat', '由垫子计数');
+  String get countFromMatOn =>
+      _t('The mat counts each stand automatically', '垫子自动记录每次起立');
+  String get countManually => _t('You\'ll tap to count', '由您点按计数');
+  String get matNotConnectedCount =>
+      _t('Mat not connected — tap to count', '垫子未连接 — 点按计数');
+  String get matIsCounting => _t('Mat is counting…', '垫子正在计数…');
+  String get testComplete => _t('Test complete', '测试完成');
+  String get standsInThirtySeconds =>
+      _t('stands in 30 seconds', '30 秒内起立次数');
+  String get belowAverage => _t('Below average', '低于平均');
+  String get average => _t('Average', '平均水平');
+  String get aboveAverage => _t('Above average', '高于平均');
+  String get chairStandBelowDesc => _t(
+      'This is below the typical range for their age, which can be linked to a higher fall risk. Regular daily exercise can help build leg strength.',
+      '这低于同龄常见范围，可能与较高的跌倒风险相关。坚持每日锻炼有助于增强腿部力量。');
+  String get chairStandAverageDesc => _t(
+      'This is within the typical range for their age. Keep up regular exercise to maintain it.',
+      '这处于同龄常见范围内。坚持规律锻炼以保持状态。');
+  String get chairStandAboveDesc => _t(
+      'This is above the typical range for their age — a good sign. Great work!',
+      '这高于同龄常见范围 — 是个好迹象。表现很棒！');
+  String get recommendedDailyGoal => _t('Recommended daily goal', '建议每日目标');
+  String repsPerDayValue(int n) => _t('$n reps per day', '每天 $n 次');
+  String setDailyGoalTo(int n) =>
+      _t('Set daily goal to $n reps', '将每日目标设为 $n 次');
+  String get saveResult => _t('Save result', '保存结果');
+  String get redoTest => _t('Redo test', '重新测试');
+  String get testSaved => _t('Fitness test saved', '体能测试已保存');
+  String get couldNotSaveTest =>
+      _t('Could not save the test. Please try again.', '无法保存测试，请重试。');
+
+  // Chair-stand card / prompts on the senior screen
+  String get chairStandCardTitle => _t('Chair Stand Test', '坐立测试');
+  String get chairStandNeverTested =>
+      _t('Not tested yet', '尚未测试');
+  String chairStandLastTested(String when) =>
+      _t('Last tested $when', '上次测试：$when');
+  String get chairStandDoTest => _t('Do the test', '进行测试');
+  String get chairStandRetest => _t('Retest', '重新测试');
+  String chairStandBaselinePrompt(String name) => _t(
+      'Do a quick 30-second fitness test with $name to set the right starting goal.',
+      '与 $name 做一次 30 秒体能测试，以设定合适的起始目标。');
+  String chairStandDuePrompt(String name) => _t(
+      "It's time for $name's monthly fitness check.",
+      '该为 $name 进行每月体能检测了。');
+  String chairStandStandsValue(int n) => _t('$n stands', '$n 次');
+  String get chairStandTrend =>
+      _t('Trend over time (stands)', '历次趋势（次数）');
+
+  // Report (PDF) — 30CST row
+  String get chairStandReportLabel =>
+      _t('30-Sec Chair Stand Test', '30 秒坐立测试');
+  String get chairStandReportSub =>
+      _t('Stands in 30s — leg strength & fall risk', '30 秒起立次数 — 腿力与跌倒风险');
 }
 
 class _AppLocalizationsDelegate

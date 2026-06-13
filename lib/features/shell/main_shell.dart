@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/live_session_provider.dart';
+import '../../providers/mobility_alert_provider.dart';
+import '../../services/notifications/push_service.dart';
 import '../home/home_screen.dart';
 import '../insights/insights_screen.dart';
 import '../hardware/hardware_screen.dart';
 import '../settings/settings_screen.dart';
 
-class MainShell extends StatefulWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends ConsumerState<MainShell>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   final _screens = const [
@@ -25,8 +31,38 @@ class _MainShellState extends State<MainShell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Register this device for push so decline / fitness-check reminders reach
+    // the caregiver even when the app is closed (delivered by the scheduled
+    // Cloud Function in functions/).
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid != null) PushService().register(uid);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Persist any in-progress session when the app is backgrounded so reps
+    // aren't lost if the OS kills it.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      ref.read(liveSessionProvider.notifier).flushNow();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // Keep the mobility-decline watcher alive for the whole session so a
+    // caregiver is alerted even when not viewing the affected senior.
+    ref.watch(mobilityAlertWatcherProvider);
     final destinations = [
       NavigationDestination(
         icon: const Icon(Icons.home_outlined),

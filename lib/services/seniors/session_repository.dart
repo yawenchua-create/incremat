@@ -40,6 +40,9 @@ class SessionRepository {
   Future<void> add({
     required int repCount,
     required double avgRepTimeSeconds,
+    double firstFiveRepsSeconds = 0.0,
+    String source = 'mat',
+    String? recordedBy,
   }) async {
     final doc = _col.doc();
     await doc.set(SessionLog(
@@ -48,6 +51,9 @@ class SessionRepository {
       timestamp: DateTime.now(),
       repCount: repCount,
       avgRepTimeSeconds: avgRepTimeSeconds,
+      firstFiveRepsSeconds: firstFiveRepsSeconds,
+      source: source,
+      recordedBy: recordedBy,
       synced: false,
     ).toMap());
   }
@@ -59,6 +65,18 @@ class SessionRepository {
         .snapshots()
         .map((snap) =>
             snap.docs.map((d) => SessionLog.fromMap(d.data(), d.id)).toList());
+  }
+
+  /// One-shot fetch of sessions whose timestamp falls within [start, end].
+  Future<List<SessionLog>> getInRange(DateTime start, DateTime end) async {
+    final snap = await _col
+        .where('timestamp',
+            isGreaterThanOrEqualTo: start.millisecondsSinceEpoch)
+        .where('timestamp', isLessThanOrEqualTo: end.millisecondsSinceEpoch)
+        .get();
+    return snap.docs
+        .map((d) => SessionLog.fromMap(d.data(), d.id))
+        .toList();
   }
 
   Stream<List<SessionLog>> watchSince(DateTime since) {

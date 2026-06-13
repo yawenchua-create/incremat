@@ -36,6 +36,7 @@ class InsightsScreen extends ConsumerWidget {
                   ),
                 ),
                 SliverToBoxAdapter(child: _RepStats()),
+                SliverToBoxAdapter(child: _SitToStandStat()),
               ],
             ],
             SliverToBoxAdapter(
@@ -398,6 +399,144 @@ class _RepStats extends ConsumerWidget {
               spots: consistencySpots.length >= 2 ? consistencySpots : fallbackSpots,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Everyday sit-to-stand pace: latest 5-rep time and its recent trend. A
+/// personal day-to-day trend, NOT a clinical test or fall-risk rating.
+class _SitToStandStat extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final senior = ref.watch(selectedSeniorProvider);
+    if (senior == null) return const SizedBox.shrink();
+    final insights = ref.watch(seniorInsightsProvider(senior.id));
+    final seconds = insights.latestFiveRepSeconds;
+    final measured = seconds > 0;
+    const color = AppColors.sageGreen;
+
+    // Trend sparkline: best 5-rep time per day over the recent window.
+    final sessions =
+        ref.watch(mobilityWindowSessionsProvider(senior.id)).valueOrNull ?? [];
+    final best = <DateTime, double>{};
+    for (final s in sessions) {
+      if (!s.hasFiveRepTime) continue;
+      final k = DateTime(s.timestamp.year, s.timestamp.month, s.timestamp.day);
+      final cur = best[k];
+      if (cur == null || s.firstFiveRepsSeconds < cur) {
+        best[k] = s.firstFiveRepsSeconds;
+      }
+    }
+    final days = best.keys.toList()..sort();
+    final recent = days.length > 7 ? days.sublist(days.length - 7) : days;
+    final spots = [
+      for (var i = 0; i < recent.length; i++)
+        FlSpot(i.toDouble(), best[recent[i]]!)
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.lightSage.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.accessibility_new_outlined,
+                    size: 16, color: AppColors.sageGreen),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.fiveRepStatTitle,
+                        style: AppTextStyles.titleMedium.copyWith(fontSize: 12)),
+                    Text(l.fiveRepStatSubtitle, style: AppTextStyles.caption),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (measured)
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: seconds.toStringAsFixed(1),
+                    style: AppTextStyles.statMedium
+                        .copyWith(fontSize: 30, color: color),
+                  ),
+                  TextSpan(
+                    text: ' ${l.secUnit}',
+                    style: AppTextStyles.bodySmall.copyWith(fontSize: 13),
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(l.doFiveReps, style: AppTextStyles.titleMedium),
+          const SizedBox(height: 4),
+          Text(l.fiveRepExplain, style: AppTextStyles.caption),
+          if (spots.length >= 2) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: LineChart(
+                LineChartData(
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  titlesData: const FlTitlesData(
+                    leftTitles:
+                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles:
+                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles:
+                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles:
+                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: color,
+                      barWidth: 1.5,
+                      dotData: FlDotData(
+                        show: true,
+                        getDotPainter: (s, pct, bar, idx) =>
+                            FlDotCirclePainter(
+                                radius: 2, color: color, strokeWidth: 0),
+                      ),
+                      belowBarData: BarAreaData(show: false),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

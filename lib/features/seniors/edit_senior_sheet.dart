@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/utils/chair_stand.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../providers/senior_provider.dart';
+import 'sex_selector.dart';
 
 class EditSeniorSheet extends ConsumerStatefulWidget {
   final Senior senior;
@@ -18,6 +20,7 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _ageCtrl;
+  late Sex _sex;
   bool _isSaving = false;
 
   @override
@@ -25,6 +28,7 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.senior.name);
     _ageCtrl = TextEditingController(text: '${widget.senior.age}');
+    _sex = widget.senior.sex;
   }
 
   @override
@@ -42,6 +46,7 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
             widget.senior.id,
             name: _nameCtrl.text.trim(),
             age: int.parse(_ageCtrl.text.trim()),
+            sex: _sex,
           );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -113,6 +118,11 @@ class _EditSeniorSheetState extends ConsumerState<EditSeniorSheet> {
                   if (age == null || age < 1 || age > 120) return l.enterValidAge;
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              SexSelector(
+                value: _sex,
+                onChanged: (s) => setState(() => _sex = s),
               ),
               const SizedBox(height: 24),
               SizedBox(

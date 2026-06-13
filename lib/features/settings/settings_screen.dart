@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/auth_errors.dart';
+import '../../core/utils/chair_stand.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../providers/auth_provider.dart';
@@ -256,7 +257,8 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
   void initState() {
     super.initState();
     _goal = widget.senior.dailyRepGoal;
-    _sliderValue = _goal.clamp(5, 50).toDouble();
+    _sliderValue =
+        _goal.clamp(ChairStand.goalMin, ChairStand.goalMax).toDouble();
   }
 
   @override
@@ -265,7 +267,8 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
     final incoming = widget.senior.dailyRepGoal;
     if (_goal != incoming) {
       _goal = incoming;
-      _sliderValue = incoming.clamp(5, 50).toDouble();
+      _sliderValue =
+          incoming.clamp(ChairStand.goalMin, ChairStand.goalMax).toDouble();
     }
   }
 
@@ -326,9 +329,9 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
             ),
             child: Slider(
               value: _sliderValue,
-              min: 5,
-              max: 50,
-              divisions: 9,
+              min: ChairStand.goalMin.toDouble(),
+              max: ChairStand.goalMax.toDouble(),
+              divisions: (ChairStand.goalMax - ChairStand.goalMin) ~/ 5,
               onChanged: (v) => setState(() {
                 _sliderValue = v;
                 _goal = v.round();
@@ -352,10 +355,43 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [5, 15, 25, 35, 50]
+              children: [5, 25, 50, 75, 100]
                   .map((v) => Text('$v', style: AppTextStyles.caption))
                   .toList(),
             ),
+          ),
+          _GoalCapacityHint(senior: widget.senior, goal: _goal),
+        ],
+      ),
+    );
+  }
+}
+
+/// Gentle caution if the daily goal is set well above the senior's measured
+/// 30CST capacity (more than ~2× the suggested starting goal).
+class _GoalCapacityHint extends StatelessWidget {
+  final Senior senior;
+  final int goal;
+  const _GoalCapacityHint({required this.senior, required this.goal});
+
+  @override
+  Widget build(BuildContext context) {
+    final reps = senior.chairStandReps;
+    if (reps == null) return const SizedBox.shrink();
+    final recommended = ChairStand.recommendedDailyGoal(reps);
+    if (goal <= recommended * 2) return const SizedBox.shrink();
+    final l = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 16, color: Color(0xFFD9A441)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(l.goalAboveCapacity(recommended),
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.subtleText)),
           ),
         ],
       ),
