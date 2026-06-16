@@ -49,55 +49,59 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
         title: Text(l.devSimulator),
       ),
       body: SafeArea(
-        child: ListView(
+        // SingleChildScrollView + Column (not ListView): a ListView's lazy
+        // sliver viewport laid out with degenerate geometry on Android 16 /
+        // Impeller — content painted but had zero hit-test size, so buttons
+        // didn't respond. Eager box layout avoids that.
+        child: SingleChildScrollView(
           controller: _scrollCtrl,
-          // Always allow scrolling (and overscroll back up) even when the
-          // content nearly fits — otherwise it can get stuck after scrolling.
-          physics: const AlwaysScrollableScrollPhysics(),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(20, 8, 20, 32 + keyboardInset),
-          children: [
-            _card(
-              child: SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: simMode,
-                activeThumbColor: AppColors.sageGreen,
-                title: Text(l.devSimulatorMode),
-                subtitle: Text(l.devSimulatorModeHint),
-                onChanged: (v) =>
-                    ref.read(simulatorModeProvider.notifier).set(v),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _card(
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: simMode,
+                  activeThumbColor: AppColors.sageGreen,
+                  title: Text(l.devSimulatorMode),
+                  subtitle: Text(l.devSimulatorModeHint),
+                  onChanged: (v) =>
+                      ref.read(simulatorModeProvider.notifier).set(v),
+                ),
               ),
-            ),
-            // Gate on the persisted simMode (not the live service instance) so
-            // the controls don't collapse during a service swap; show a stable
-            // placeholder for the brief moment before the simulator is ready.
-            if (!simMode)
-              _card(
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text(
-                    l.devSimulatorTurnOnHint,
-                    style: const TextStyle(color: AppColors.subtleText),
+              // Gate on the persisted simMode (not the live service instance) so
+              // the controls don't collapse during a service swap; show a stable
+              // placeholder for the brief moment before the simulator is ready.
+              if (!simMode)
+                _card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      l.devSimulatorTurnOnHint,
+                      style: const TextStyle(color: AppColors.subtleText),
+                    ),
                   ),
-                ),
-              )
-            else if (sim == null)
-              _card(
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text(
-                    l.devStartingSimulator,
-                    style: const TextStyle(color: AppColors.subtleText),
+                )
+              else if (sim == null)
+                _card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      l.devStartingSimulator,
+                      style: const TextStyle(color: AppColors.subtleText),
+                    ),
                   ),
-                ),
-              )
-            else ...[
-              _RepsCard(sim: sim),
-              _ConnectionCard(sim: sim),
-              _SpeedCard(sim: sim),
-              _NfcCard(sim: sim, controller: _nfcCtrl),
+                )
+              else ...[
+                _RepsCard(sim: sim),
+                _ConnectionCard(sim: sim),
+                _SpeedCard(sim: sim),
+                _NfcCard(sim: sim, controller: _nfcCtrl),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

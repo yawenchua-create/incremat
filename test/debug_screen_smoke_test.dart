@@ -35,4 +35,21 @@ void main() {
     expect(find.text('Auto reps'), findsOneWidget);
     expect(find.text('Connection'), findsOneWidget);
   });
+
+  testWidgets('rep buttons are tappable and drive the count', (tester) async {
+    SharedPreferences.setMockInitialValues({'simulator_mode': true});
+    await tester.pumpWidget(_wrap());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Guards against the layout regression where the controls painted but had
+    // zero hit-test size, so taps never reached the buttons.
+    expect(find.text('0'), findsOneWidget);
+    await tester.tap(find.text('+1'));
+    await tester.pump();
+    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.text('+5'));
+    await tester.pump();
+    expect(find.text('6'), findsOneWidget);
+  });
 }
