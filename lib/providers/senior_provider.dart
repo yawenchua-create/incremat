@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../models/senior.dart';
 import '../models/session_log.dart';
 import '../services/notifications/notification_service.dart';
+import '../services/nfc/nfc_uid_service.dart';
 import '../services/seniors/join_code_service.dart';
 import '../services/seniors/senior_repository.dart';
 import '../services/seniors/session_repository.dart';
@@ -173,12 +174,30 @@ class SeniorsNotifier extends Notifier<void> {
   /// Connects the current caregiver to an existing senior via join code.
   /// Returns null on success, or an error message string.
   Future<String?> connectSenior(String code, AppLocalizations l) async {
+    final seniorId = await JoinCodeService().lookup(code);
+    if (seniorId == null) return l.codeNotFound;
+    return _connectToSenior(seniorId, l);
+  }
+
+  /// Connects the current caregiver to an existing senior by the UID of a card
+  /// that has already been enrolled to that senior (e.g. via [NfcWriteSheet]).
+  /// Returns null on success, or an error message string.
+  Future<String?> connectSeniorByNfcUid(String uid, AppLocalizations l) async {
+    final seniorId = await NfcUidService().lookup(uid);
+    if (seniorId == null) return l.cardNotLinked;
+    return _connectToSenior(seniorId, l);
+  }
+
+  /// Shared connect path: validates the senior exists, isn't already monitored,
+  /// then adds the current caregiver as a secondary caregiver.
+  Future<String?> _connectToSenior(String seniorId, AppLocalizations l) async {
     final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) return l.notSignedIn;
-    final seniorId = await JoinCodeService().lookup(code);
-    if (seniorId == null) {
-      return l.codeNotFound;
-    }
+    final seniorDoc = await FirebaseFirestore.instance
+        .collection('seniors')
+        .doc(seniorId)
+        .get();
+    if (!seniorDoc.exists) return l.codeNotFound;
     // Check if already connected.
     final existing = await FirebaseFirestore.instance
         .collection('seniors/$seniorId/caregivers')

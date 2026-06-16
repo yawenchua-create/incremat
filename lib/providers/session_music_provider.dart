@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/senior.dart';
 import 'hardware_provider.dart';
+import 'locale_provider.dart';
 import 'senior_provider.dart';
 
 /// Gapless layered-music engine using isolated instrument stems.
@@ -25,6 +29,24 @@ import 'senior_provider.dart';
 ///   * The track loops continuously; the session ends only on manual stop.
 const int kLayerCount = 5;
 
+/// Master volume range. 0–100% is normal device volume; 100–200% applies an
+/// extra gain boost (via AndroidLoudnessEnhancer) so the music can play louder
+/// than the phone's usual maximum.
+const double kMaxVolume = 2.0;
+
+/// Loudness-enhancer gain (just_audio targetGain units, ≈ tens of dB) applied
+/// at full boost (200%). ~1.0 ≈ +10 dB. Below 100% no boost is applied.
+const double _kMaxBoostGain = 1.0;
+
+/// A spoken count is read out every this many reps to encourage the senior
+/// ("5", "10", "15"…). The music keeps playing underneath.
+const int kAnnounceEvery = 5;
+
+/// How far the music is ducked (its volume multiplier) while the count is
+/// spoken, so the voice is clearly audible over it. 0.25 = 25% of current
+/// volume. Restored to full once the announcement finishes.
+const double _kDuckFactor = 0.25;
+
 /// Stem filenames in build-up order (layer 1 → layer 5). Each song folder
 /// under assets/audio/stems/ holds these same five files.
 const List<String> kStemFiles = [
@@ -44,7 +66,11 @@ class SongOption {
   final String id;
   final String name;
   final String folder;
-  const SongOption({required this.id, required this.name, required this.folder});
+  const SongOption({
+    required this.id,
+    required this.name,
+    required this.folder,
+  });
 }
 
 const List<SongOption> kSongs = [
@@ -133,6 +159,9 @@ class SessionMusicState {
   /// Display name of the song currently loaded.
   final String songName;
 
+  /// Master volume, 0.0–[kMaxVolume]. Above 1.0 boosts past the phone's max.
+  final double volume;
+
   const SessionMusicState({
     required this.started,
     required this.ended,
@@ -144,6 +173,7 @@ class SessionMusicState {
     required this.assetMissing,
     required this.repsPerLayer,
     required this.songName,
+    this.volume = 1.0,
   });
 
   factory SessionMusicState.initial({int? repsPerLayer, String? songName}) =>
@@ -159,6 +189,9 @@ class SessionMusicState {
         repsPerLayer: repsPerLayer ?? kDefaultRepsPerLayer,
         songName: songName ?? kSongs.first.name,
       );
+
+  /// True when boosting above the phone's normal maximum.
+  bool get isBoosted => volume > 1.0;
 
   /// Progress through the track in the range 0.0–1.0.
   double get trackProgress {
@@ -178,25 +211,69 @@ class SessionMusicState {
     bool? assetMissing,
     int? repsPerLayer,
     String? songName,
-  }) =>
-      SessionMusicState(
-        started: started ?? this.started,
-        ended: ended ?? this.ended,
-        reps: reps ?? this.reps,
-        layer: layer ?? this.layer,
-        isPlaying: isPlaying ?? this.isPlaying,
-        position: position ?? this.position,
-        duration: duration ?? this.duration,
-        assetMissing: assetMissing ?? this.assetMissing,
-        repsPerLayer: repsPerLayer ?? this.repsPerLayer,
-        songName: songName ?? this.songName,
-      );
+    double? volume,
+  }) => SessionMusicState(
+    started: started ?? this.started,
+    ended: ended ?? this.ended,
+    reps: reps ?? this.reps,
+    layer: layer ?? this.layer,
+    isPlaying: isPlaying ?? this.isPlaying,
+    position: position ?? this.position,
+    duration: duration ?? this.duration,
+    assetMissing: assetMissing ?? this.assetMissing,
+    repsPerLayer: repsPerLayer ?? this.repsPerLayer,
+    songName: songName ?? this.songName,
+    volume: volume ?? this.volume,
+  );
 }
 
 class SessionMusicNotifier extends Notifier<SessionMusicState> {
   /// One player per stem. Index 0 (drums) is the master clock.
   late final List<AudioPlayer> _players;
   AudioPlayer get _master => _players[0];
+
+  /// One loudness enhancer per stem (Android) for the >100% volume boost.
+  late final List<AndroidLoudnessEnhancer> _enhancers;
+
+  /// Per-stem layer gain (0–1, the fade target). The actual player volume is
+  /// this × the master volume scalar, so the master slider and the per-layer
+  /// fades compose cleanly.
+  final List<double> _layerGain = List.filled(kLayerCount, 0.0);
+
+  static const _volKey = 'session_music_volume';
+  double _volume = 1.0;
+  // Once the user touches the slider, don't let the async restore clobber it.
+  bool _volumeTouched = false;
+
+  /// Text-to-speech engine for the spoken rep-count encouragements.
+  FlutterTts? _tts;
+
+  /// Temporary music-volume multiplier (1.0 = normal). Dropped to [_kDuckFactor]
+  /// while a count is being spoken, then restored. Composes with the master
+  /// volume and the per-layer gain in [_pushStemVolume].
+  double _duckFactor = 1.0;
+
+  /// Highest rep milestone already announced this session, so each "5/10/15…"
+  /// is spoken exactly once even though the mat reports a cumulative count.
+  int _lastAnnounced = 0;
+  bool _announcing = false;
+
+  // 0–100% maps to the player's own volume; above 100% pins it at 1.0 and the
+  // extra is applied as loudness-enhancer gain.
+  double get _volScalar => _volume < 1.0 ? _volume : 1.0;
+  double get _boostGain => _volume <= 1.0
+      ? 0.0
+      : ((_volume - 1.0) * _kMaxBoostGain).clamp(0.0, _kMaxBoostGain);
+
+  void _pushStemVolume(int i) => _players[i].setVolume(
+    (_layerGain[i] * _volScalar * _duckFactor).clamp(0.0, 1.0),
+  );
+
+  void _applyBoost() {
+    for (final e in _enhancers) {
+      e.setTargetGain(_boostGain);
+    }
+  }
 
   StreamSubscription<int>? _repSub;
   StreamSubscription<Duration>? _posSub;
@@ -215,7 +292,16 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
 
   @override
   SessionMusicState build() {
-    _players = List.generate(kLayerCount, (_) => AudioPlayer());
+    _enhancers = List.generate(kLayerCount, (_) => AndroidLoudnessEnhancer());
+    _players = List.generate(
+      kLayerCount,
+      (i) => AudioPlayer(
+        audioPipeline: AudioPipeline(androidAudioEffects: [_enhancers[i]]),
+      ),
+    );
+    for (final e in _enhancers) {
+      e.setEnabled(true);
+    }
 
     // Consume the existing BLE rep-count stream — we never re-implement BLE.
     final service = ref.watch(hardwareServiceProvider);
@@ -251,6 +337,11 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
       _onSongChanged(folder);
     });
 
+    // Keep the spoken-count voice in the app's current language.
+    ref.listen<Locale>(localeProvider, (_, locale) {
+      _applyTtsLanguage(locale);
+    });
+
     ref.onDispose(() {
       _repSub?.cancel();
       _posSub?.cancel();
@@ -263,15 +354,103 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
       for (final p in _players) {
         p.dispose();
       }
+      _tts?.stop();
     });
 
     final goal = ref.read(selectedSeniorProvider)?.dailyRepGoal;
     _currentFolder = ref.read(activeSongFolderProvider);
     _preloadStems(_currentFolder);
+    _loadVolume();
+    _initTts(ref.read(localeProvider));
     return SessionMusicState.initial(
       repsPerLayer: repsPerLayerForGoal(goal ?? 0),
       songName: songForFolder(_currentFolder).name,
     );
+  }
+
+  /// Restores the saved master volume and applies it.
+  Future<void> _loadVolume() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_volumeTouched) return; // user already adjusted it — don't override
+    _volume = (prefs.getDouble(_volKey) ?? 1.0).clamp(0.0, kMaxVolume);
+    state = state.copyWith(volume: _volume);
+    _applyBoost();
+    for (var i = 0; i < kLayerCount; i++) {
+      _pushStemVolume(i);
+    }
+  }
+
+  /// Sets the master volume (0.0–[kMaxVolume]); above 1.0 boosts past the
+  /// phone's normal maximum. Persists the choice for next time.
+  Future<void> setMasterVolume(double v) async {
+    _volumeTouched = true;
+    _volume = v.clamp(0.0, kMaxVolume);
+    state = state.copyWith(volume: _volume);
+    for (var i = 0; i < kLayerCount; i++) {
+      _pushStemVolume(i);
+    }
+    _applyBoost();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_volKey, _volume);
+  }
+
+  // ---- spoken rep-count encouragements --------------------------------------
+
+  /// Prepares the text-to-speech engine: a slower, clear voice suited to
+  /// elderly listeners, set to wait for each utterance to finish.
+  Future<void> _initTts(Locale locale) async {
+    try {
+      final tts = FlutterTts();
+      await tts.awaitSpeakCompletion(true);
+      await tts.setSpeechRate(0.45); // slower & clearer than the default
+      await tts.setVolume(1.0);
+      await tts.setPitch(1.0);
+      _tts = tts;
+      await _applyTtsLanguage(locale);
+    } catch (_) {
+      _tts = null; // TTS unavailable on this device — feature just stays silent
+    }
+  }
+
+  Future<void> _applyTtsLanguage(Locale locale) async {
+    final tts = _tts;
+    if (tts == null) return;
+    final lang = locale.languageCode == 'zh' ? 'zh-CN' : 'en-US';
+    try {
+      await tts.setLanguage(lang);
+    } catch (_) {}
+  }
+
+  /// If [cumulativeReps] has reached a new multiple of [kAnnounceEvery], speak
+  /// that count out loud once, ducking the music underneath it.
+  void _maybeAnnounce(int cumulativeReps) {
+    if (_tts == null) return;
+    final milestone = (cumulativeReps ~/ kAnnounceEvery) * kAnnounceEvery;
+    if (milestone < kAnnounceEvery || milestone <= _lastAnnounced) return;
+    _lastAnnounced = milestone;
+    _announce(milestone);
+  }
+
+  /// Ducks the music, speaks [count], then restores the music volume.
+  Future<void> _announce(int count) async {
+    final tts = _tts;
+    if (tts == null || _announcing) return; // don't overlap ducking
+    _announcing = true;
+    _duckFactor = _kDuckFactor;
+    for (var i = 0; i < kLayerCount; i++) {
+      _pushStemVolume(i);
+    }
+    try {
+      await tts.stop();
+      await tts.speak('$count');
+    } catch (_) {
+      // ignore — restore volume regardless below
+    }
+    _duckFactor = 1.0;
+    for (var i = 0; i < kLayerCount; i++) {
+      _pushStemVolume(i);
+    }
+    _announcing = false;
   }
 
   /// Loads every stem of [folder], sets it to loop, and mutes it. They sit
@@ -284,6 +463,7 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
         // Loop is driven as a group from the master's completion (see
         // _loopAll), so individual players must NOT auto-loop.
         await _players[i].setLoopMode(LoopMode.off);
+        _layerGain[i] = 0.0;
         await _players[i].setVolume(0);
       }
       _ready = true;
@@ -320,6 +500,8 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
 
   void _onRep(int cumulativeReps) {
     if (state.ended) return;
+    // The mat reset its counter (new session) — start announcing from zero again.
+    if (cumulativeReps < state.reps) _lastAnnounced = 0;
     final targetLayer = layerForReps(cumulativeReps, state.repsPerLayer);
 
     if (!state.started) {
@@ -327,8 +509,14 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
         state = state.copyWith(reps: cumulativeReps);
         return;
       }
-      state = state.copyWith(started: true, reps: cumulativeReps, layer: targetLayer);
+      _lastAnnounced = 0;
+      state = state.copyWith(
+        started: true,
+        reps: cumulativeReps,
+        layer: targetLayer,
+      );
       _startPlayback(targetLayer);
+      _maybeAnnounce(cumulativeReps);
       return;
     }
 
@@ -341,6 +529,7 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
         _fadeTo(i, 1.0);
       }
     }
+    _maybeAnnounce(cumulativeReps);
   }
 
   void _onGoalChanged(int? goal) {
@@ -379,15 +568,18 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     try {
       for (var i = 0; i < kLayerCount; i++) {
         await _players[i].seek(Duration.zero);
-        await _players[i].setVolume(i < audibleLayers ? 1.0 : 0.0);
+        _layerGain[i] = i < audibleLayers ? 1.0 : 0.0;
+        _pushStemVolume(i);
       }
       // Start them as close together as possible.
       await Future.wait(_players.map((p) => p.play()));
       // One alignment pass after start jitter settles, then keep correcting.
       Future.delayed(const Duration(milliseconds: 400), _syncStems);
       _syncTimer?.cancel();
-      _syncTimer =
-          Timer.periodic(const Duration(seconds: 2), (_) => _syncStems());
+      _syncTimer = Timer.periodic(
+        const Duration(seconds: 2),
+        (_) => _syncStems(),
+      );
     } catch (_) {
       state = state.copyWith(assetMissing: true);
     }
@@ -424,21 +616,23 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     }
   }
 
-  /// Smoothly ramps stem [i]'s volume to [target] over ~700 ms.
+  /// Smoothly ramps stem [i]'s layer gain to [target] over ~700 ms. The actual
+  /// player volume is the gain scaled by the master volume.
   void _fadeTo(int i, double target) {
     _fadeTimers[i]?.cancel();
     const steps = 14;
     const stepDur = Duration(milliseconds: 50);
-    final start = _players[i].volume;
+    final start = _layerGain[i];
     final delta = target - start;
     if (delta == 0) return;
     var step = 0;
     _fadeTimers[i] = Timer.periodic(stepDur, (t) {
       step++;
-      final v = (start + delta * (step / steps)).clamp(0.0, 1.0);
-      _players[i].setVolume(v);
+      _layerGain[i] = (start + delta * (step / steps)).clamp(0.0, 1.0);
+      _pushStemVolume(i);
       if (step >= steps) {
-        _players[i].setVolume(target);
+        _layerGain[i] = target;
+        _pushStemVolume(i);
         t.cancel();
       }
     });
@@ -467,7 +661,8 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     for (var i = 0; i < kLayerCount; i++) {
       _fadeTimers[i]?.cancel();
       await _players[i].seek(Duration.zero);
-      await _players[i].setVolume(i < layer ? 1.0 : 0.0);
+      _layerGain[i] = i < layer ? 1.0 : 0.0;
+      _pushStemVolume(i);
     }
     state = state.copyWith(ended: false, layer: layer, position: Duration.zero);
     await Future.wait(_players.map((p) => p.play()));
@@ -487,4 +682,5 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
 
 final sessionMusicProvider =
     NotifierProvider<SessionMusicNotifier, SessionMusicState>(
-        SessionMusicNotifier.new);
+      SessionMusicNotifier.new,
+    );

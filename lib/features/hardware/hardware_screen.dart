@@ -28,24 +28,16 @@ class HardwareScreen extends ConsumerWidget {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _HardwareHeader()),
-            SliverToBoxAdapter(
-              child: _ConnectionBadge(status: status),
-            ),
+            SliverToBoxAdapter(child: _ConnectionBadge(status: status)),
             if (liveSession != null)
               SliverToBoxAdapter(
                 child: _LiveSessionCard(liveSession: liveSession),
               ),
             // NFC tap-to-identify so sessions are credited to the right user.
             SliverToBoxAdapter(child: _NfcIdentifyCard()),
-            const SliverToBoxAdapter(
-              child: _ChairIllustration(),
-            ),
-            SliverToBoxAdapter(
-              child: _StatusCards(status: status),
-            ),
-            SliverToBoxAdapter(
-              child: _ConnectButton(status: status),
-            ),
+            const SliverToBoxAdapter(child: _ChairIllustration()),
+            SliverToBoxAdapter(child: _StatusCards(status: status)),
+            SliverToBoxAdapter(child: _ConnectButton(status: status)),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
@@ -65,8 +57,10 @@ class _HardwareHeader extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AppLocalizations.of(context).hardwareTitle,
-                  style: AppTextStyles.headlineLarge),
+              Text(
+                AppLocalizations.of(context).hardwareTitle,
+                style: AppTextStyles.headlineLarge,
+              ),
               const SizedBox(height: 4),
               Text(
                 AppLocalizations.of(context).hardwareSubtitle,
@@ -89,10 +83,13 @@ class _HardwareHeader extends StatelessWidget {
               ],
             ),
             child: const Center(
-              child: Text('?',
-                  style: TextStyle(
-                      color: AppColors.subtleText,
-                      fontWeight: FontWeight.w600)),
+              child: Text(
+                '?',
+                style: TextStyle(
+                  color: AppColors.subtleText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -183,14 +180,15 @@ class _LiveSessionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.sageGreen.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.sageGreen.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.sageGreen.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.fitness_center_outlined,
-              size: 20, color: AppColors.sageGreen),
+          const Icon(
+            Icons.fitness_center_outlined,
+            size: 20,
+            color: AppColors.sageGreen,
+          ),
           const SizedBox(width: 12),
           Text(l.liveSessionLabel, style: AppTextStyles.titleMedium),
           Text(
@@ -237,6 +235,9 @@ class _StatusCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // No mat connected → there are no real readings, so show "—" rather than
+    // a misleading 0% / "Weak" that looks like live data.
+    final connected = status.isConnected;
     final signal = switch (status.signalLabel) {
       'Strong' => l.signalStrong,
       'Good' => l.signalGood,
@@ -249,16 +250,20 @@ class _StatusCards extends StatelessWidget {
           Expanded(
             child: _InfoCard(
               icon: Icons.battery_charging_full_outlined,
-              label: l.batteryLabel(status.batteryPercent),
-              iconColor: _batteryColor(status.batteryPercent),
+              label: connected
+                  ? l.batteryLabel(status.batteryPercent)
+                  : l.batteryUnknown,
+              iconColor: connected
+                  ? _batteryColor(status.batteryPercent)
+                  : AppColors.subtleText,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: _InfoCard(
               icon: Icons.signal_cellular_alt_outlined,
-              label: l.signalLabelText(signal),
-              iconColor: AppColors.sageGreen,
+              label: connected ? l.signalLabelText(signal) : l.signalUnknown,
+              iconColor: connected ? AppColors.sageGreen : AppColors.subtleText,
             ),
           ),
         ],
@@ -322,7 +327,10 @@ class _ConnectButton extends ConsumerWidget {
   }
 
   Future<void> _onTap(
-      BuildContext context, WidgetRef ref, bool isConnected) async {
+    BuildContext context,
+    WidgetRef ref,
+    bool isConnected,
+  ) async {
     final l = AppLocalizations.of(context);
     final service = ref.read(hardwareServiceProvider);
     ref.read(hardwareConnectingProvider.notifier).state = true;
@@ -334,9 +342,9 @@ class _ConnectButton extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.connectionFailed('$e'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.connectionFailed('$e'))));
       }
     } finally {
       ref.read(hardwareConnectingProvider.notifier).state = false;
@@ -370,7 +378,10 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
 
   Future<void> _onMatUid(String uid) async {
     if (!mounted) return;
-    setState(() { _statusMsg = null; _isError = false; });
+    setState(() {
+      _statusMsg = null;
+      _isError = false;
+    });
     await _resolveUid(uid);
   }
 
@@ -420,12 +431,20 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
       });
       return;
     }
-    setState(() { _scanning = true; _statusMsg = null; _isError = false; });
+    setState(() {
+      _scanning = true;
+      _statusMsg = null;
+      _isError = false;
+    });
     await NfcService.readUid(
       onRead: (uid) => _resolveUid(uid),
       onError: (msg) {
         if (mounted) {
-          setState(() { _scanning = false; _statusMsg = msg; _isError = true; });
+          setState(() {
+            _scanning = false;
+            _statusMsg = msg;
+            _isError = true;
+          });
         }
       },
     );
@@ -467,10 +486,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(l.identifyUser, style: AppTextStyles.titleMedium),
-                    Text(
-                      l.identifyUserSubtitle,
-                      style: AppTextStyles.caption,
-                    ),
+                    Text(l.identifyUserSubtitle, style: AppTextStyles.caption),
                   ],
                 ),
               ),
@@ -494,17 +510,21 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.sageGreen,
                 side: BorderSide(
-                    color: AppColors.sageGreen.withValues(alpha: 0.5)),
+                  color: AppColors.sageGreen.withValues(alpha: 0.5),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               icon: _scanning
                   ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.sageGreen),
+                        strokeWidth: 2,
+                        color: AppColors.sageGreen,
+                      ),
                     )
                   : const Icon(Icons.sensors, size: 18),
               label: Text(_scanning ? l.holdTagToPhone : l.scanNfcTag),
@@ -547,8 +567,10 @@ class _InfoCard extends StatelessWidget {
           Icon(icon, size: 20, color: iconColor),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(label,
-                style: AppTextStyles.titleMedium.copyWith(fontSize: 13)),
+            child: Text(
+              label,
+              style: AppTextStyles.titleMedium.copyWith(fontSize: 13),
+            ),
           ),
         ],
       ),

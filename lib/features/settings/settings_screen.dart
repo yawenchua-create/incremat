@@ -13,6 +13,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../auth/login_screen.dart';
 import '../session_music/session_music_screen.dart';
+import 'debug_screen.dart';
 import 'user_guide_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -892,6 +893,14 @@ class _AccountSection extends StatelessWidget {
             label: l.userGuide,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const UserGuideScreen()),
+            ),
+          ),
+          const Divider(height: 1, indent: 20, endIndent: 20),
+          _SettingsTile(
+            icon: Icons.developer_mode_outlined,
+            label: l.devSimulator,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DebugScreen()),
             ),
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
