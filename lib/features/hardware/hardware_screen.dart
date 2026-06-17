@@ -372,7 +372,15 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
     super.initState();
     // Subscribe to UIDs from the mat's NFC reader so a card tap there
     // auto-identifies the user, identical to tapping the phone manually.
-    final service = ref.read(hardwareServiceProvider);
+    _subscribeMatNfc(ref.read(hardwareServiceProvider));
+  }
+
+  /// (Re)subscribes to the mat's NFC stream. Must run again whenever the
+  /// hardware service instance changes — toggling Simulator mode swaps the
+  /// service, and without re-subscribing we'd keep listening to the old,
+  /// disposed service and never hear real card taps again.
+  void _subscribeMatNfc(HardwareService service) {
+    _matNfcSub?.cancel();
     _matNfcSub = service.nfcUidStream.listen(_onMatUid);
   }
 
@@ -411,7 +419,14 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
       return;
     }
     // An NFC tap on the mat is an authoritative "this person is on the mat now"
-    // signal: switch both the view and the rep-attribution to them.
+    // signal. Persist the OUTGOING person's in-progress session first — awaited,
+    // so it's actually logged before attribution changes — then switch both the
+    // view and the rep-attribution to the tapped person. (The reactive switch
+    // path persists in the background, which could be dropped mid-write.)
+    // ignore: avoid_print
+    print('[SESSION] NFC resolve -> switching to $seniorId; finalizing outgoing session first');
+    await ref.read(liveSessionProvider.notifier).finalizeCurrentSession();
+    if (!mounted) return;
     selectSenior(ref, seniorId);
     ref.read(activeExerciserIdProvider.notifier).state = seniorId;
     setState(() {
@@ -460,6 +475,12 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // Re-subscribe if the hardware service is swapped (e.g. Simulator mode
+    // toggled), so the mat's NFC reader keeps working without an app restart.
+    ref.listen<HardwareService>(
+      hardwareServiceProvider,
+      (_, next) => _subscribeMatNfc(next),
+    );
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       padding: const EdgeInsets.all(16),

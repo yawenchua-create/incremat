@@ -26,15 +26,13 @@ class LiveSession {
     int? repCount,
     double? avgRepTimeSeconds,
     double? firstFiveRepsSeconds,
-  }) =>
-      LiveSession(
-        seniorId: seniorId,
-        startedAt: startedAt,
-        repCount: repCount ?? this.repCount,
-        avgRepTimeSeconds: avgRepTimeSeconds ?? this.avgRepTimeSeconds,
-        firstFiveRepsSeconds:
-            firstFiveRepsSeconds ?? this.firstFiveRepsSeconds,
-      );
+  }) => LiveSession(
+    seniorId: seniorId,
+    startedAt: startedAt,
+    repCount: repCount ?? this.repCount,
+    avgRepTimeSeconds: avgRepTimeSeconds ?? this.avgRepTimeSeconds,
+    firstFiveRepsSeconds: firstFiveRepsSeconds ?? this.firstFiveRepsSeconds,
+  );
 }
 
 class LiveSessionNotifier extends Notifier<LiveSession?> {
@@ -84,12 +82,15 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
     // session's senior; only at session start do we pick the active exerciser
     // (NFC) or, failing that, the senior being viewed.
     final current = state;
-    final seniorId = current?.seniorId ??
+    final seniorId =
+        current?.seniorId ??
         ref.read(activeExerciserIdProvider) ??
         ref.read(selectedSeniorProvider)?.id;
     if (seniorId == null) return;
 
     if (current == null) {
+      // ignore: avoid_print
+      print('[SESSION] new session started: senior=$seniorId reps=$reps');
       // startedAt marks the first rep; the 5-rep time is measured against it.
       state = LiveSession(
         seniorId: seniorId,
@@ -103,7 +104,7 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
       if (updated.firstFiveRepsSeconds == 0 && reps >= 5) {
         final secs =
             DateTime.now().difference(updated.startedAt).inMilliseconds /
-                1000.0;
+            1000.0;
         if (secs > 0) updated = updated.copyWith(firstFiveRepsSeconds: secs);
       }
       state = updated;
@@ -117,6 +118,8 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
   /// person's reps start at zero.
   void _onUserSwitch(String? newSeniorId) {
     final current = state;
+    // ignore: avoid_print
+    print('[SESSION] _onUserSwitch(reactive): new=$newSeniorId current=${current == null ? 'NULL' : 'senior=${current.seniorId} reps=${current.repCount}'}');
     if (current != null && current.seniorId != newSeniorId) {
       // Clear the live state synchronously so the new user's first rep starts a
       // fresh session; persist the finished one in the background.
@@ -124,6 +127,23 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
       _finalizeSession(current);
     }
     _segmenter.establish();
+  }
+
+  /// Persists the in-progress session (if any) right now, **awaiting** the
+  /// write, then rebaselines so the next person's reps start from zero. Call
+  /// this *before* switching the active exerciser (e.g. an NFC tap on the mat)
+  /// so the outgoing person's session is logged and never lost. Unlike the
+  /// reactive [_onUserSwitch] path, the caller can await this to guarantee the
+  /// save commits before attribution changes. Does not change the
+  /// active-exerciser selection.
+  Future<void> finalizeCurrentSession() async {
+    final current = state;
+    // ignore: avoid_print
+    print('[SESSION] finalizeCurrentSession: current=${current == null ? 'NULL' : 'senior=${current.seniorId} reps=${current.repCount}'}');
+    // Clear live state up front so the next rep begins a fresh session.
+    state = null;
+    _segmenter.establish();
+    if (current != null) await _finalizeSession(current);
   }
 
   /// Mirrors the live rep count to Firestore so the play app can show it in
@@ -170,9 +190,13 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
   /// Best-effort — never throws.
   Future<void> _finalizeSession(LiveSession session) async {
     final repo = ref.read(sessionRepositoryProvider(session.seniorId));
+    // ignore: avoid_print
+    print('[SESSION] _finalizeSession: repo=${repo == null ? 'NULL' : 'ok'} reps=${session.repCount}');
     if (repo == null) return;
     try {
       final uid = ref.read(authStateProvider).valueOrNull?.uid;
+      // ignore: avoid_print
+      print('[SESSION] _finalizeSession: uid=${uid ?? 'NULL'} willSave=${session.repCount > 0 && uid != null}');
       if (session.repCount > 0 && uid != null) {
         await repo
             .add(
@@ -183,14 +207,23 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
               recordedBy: uid,
             )
             .timeout(const Duration(seconds: 8));
+        // ignore: avoid_print
+        print('[SESSION] _finalizeSession: SAVED ok for ${session.seniorId}');
       }
-    } catch (_) {}
+    } catch (e) {
+      // ignore: avoid_print
+      print('[SESSION] _finalizeSession: SAVE FAILED: $e');
+    }
     // No longer in progress — stop publishing it as live to the play app.
-    await repo.clearLive().timeout(const Duration(seconds: 5)).catchError((_) {});
+    await repo
+        .clearLive()
+        .timeout(const Duration(seconds: 5))
+        .catchError((_) {});
   }
 
   Future<void> flushNow() => _flush();
 }
 
-final liveSessionProvider =
-    NotifierProvider<LiveSessionNotifier, LiveSession?>(LiveSessionNotifier.new);
+final liveSessionProvider = NotifierProvider<LiveSessionNotifier, LiveSession?>(
+  LiveSessionNotifier.new,
+);
