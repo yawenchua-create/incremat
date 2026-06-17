@@ -74,11 +74,19 @@ final seniorInsightsProvider =
   final liveSession = ref.watch(liveSessionProvider);
   final liveReps = liveSession?.seniorId == seniorId ? (liveSession?.repCount ?? 0) : 0;
 
+  // Reps from a session that just ended (e.g. another user tapped in) stay counted
+  // until the saved record appears in the stream, so the total doesn't blink to 0.
+  final carry = ref.watch(recentlyFinalizedProvider)[seniorId];
+  final carryReflected =
+      carry != null && sessions.any((s) => !s.timestamp.isBefore(carry.at));
+  final carryReps = (carry != null && !carryReflected) ? carry.reps : 0;
+
   // Today's and yesterday's reps
   final todayReps = sessions
           .where((s) => _sameDay(s.timestamp, today))
           .fold(0, (sum, s) => sum + s.repCount) +
-      liveReps;
+      liveReps +
+      carryReps;
   final yesterday = today.subtract(const Duration(days: 1));
   final yesterdayReps = sessions
       .where((s) => _sameDay(s.timestamp, yesterday))
@@ -92,9 +100,10 @@ final seniorInsightsProvider =
         .where((s) => _sameDay(s.timestamp, day))
         .fold(0, (sum, s) => sum + s.repCount);
   });
-  // Include any in-progress live session in today's slot so active-day count is accurate.
+  // Include any in-progress live session (and just-finalized carry) in today's
+  // slot so active-day count and totals stay accurate during a user switch.
   final effectiveWeeklyReps = List<int>.from(weeklyReps);
-  if (liveReps > 0) effectiveWeeklyReps[today.weekday - 1] += liveReps;
+  effectiveWeeklyReps[today.weekday - 1] += liveReps + carryReps;
   final daysActiveThisWeek = effectiveWeeklyReps.where((r) => r > 0).length;
 
   // Weekly consistency: active days / days elapsed since first session this week.

@@ -56,6 +56,12 @@ void selectSenior(WidgetRef ref, String seniorId) {
   ref.read(_selectedSeniorIdProvider.notifier).state = seniorId;
 }
 
+/// [selectSenior] for callers holding a provider [Ref] rather than a WidgetRef
+/// (e.g. the hardware NFC coordinator reacting to a mat tap).
+void selectSeniorRef(Ref ref, String seniorId) {
+  ref.read(_selectedSeniorIdProvider.notifier).state = seniorId;
+}
+
 // Recent sessions stream per senior.
 final recentSessionsProvider =
     StreamProvider.family<List<SessionLog>, String>((ref, seniorId) {
