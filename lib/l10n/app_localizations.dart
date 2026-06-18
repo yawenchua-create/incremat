@@ -344,6 +344,13 @@ class AppLocalizations {
   String get devCardUidHint => _t('card UID (hex)', '卡片 UID（十六进制）');
   String get devEmit => _t('Emit', '发送');
 
+  String get devMobilityAlert => _t('Mobility alert', '活动预警');
+  String get devMobilityAlertHint => _t(
+    'Fire a sample sit-to-stand decline notification to preview how the caregiver warning looks.',
+    '发送一条示例的起坐能力下降通知，以预览看护者预警的样子。',
+  );
+  String get devSendSampleAlert => _t('Send sample alert', '发送示例预警');
+
   // ── Reports / PDF export ────────────────────────────────────────────────────
   String get exportMobilityReport => _t('Export Mobility Report', '导出活动报告');
   String get previewMobilityReport =>
