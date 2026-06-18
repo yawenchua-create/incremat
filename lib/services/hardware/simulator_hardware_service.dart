@@ -11,6 +11,7 @@ class SimulatorHardwareService implements HardwareService {
   final _repController = StreamController<int>.broadcast();
   final _speedController = StreamController<double>.broadcast();
   final _nfcController = StreamController<String>.broadcast();
+  final _offlineController = StreamController<NfcOfflineSession>.broadcast();
 
   // Backing state for the synthesised status. Starts disconnected so enabling
   // simulator mode never fakes a live mat — flip "Connected" in the debug
@@ -62,6 +63,8 @@ class SimulatorHardwareService implements HardwareService {
   @override
   Stream<String> get nfcUidStream => _nfcController.stream;
   @override
+  Stream<NfcOfflineSession> get offlineSessionStream => _offlineController.stream;
+  @override
   HardwareStatus get currentStatus => _build();
 
   @override
@@ -76,6 +79,18 @@ class SimulatorHardwareService implements HardwareService {
   @override
   Future<void> sendMusicTrack(String trackName) async {}
 
+  // ── NFC roster + offline sync ────────────────────────────────────────────────
+  // The simulator has no firmware buffer, so roster pushes are no-ops and an
+  // offline dump emits whatever was queued via [emitOfflineSession] (if any).
+  @override
+  Future<void> pushKnownUid(String uidHex) async {}
+  @override
+  Future<void> clearRoster() async {}
+  @override
+  Future<void> requestOfflineDump() async {}
+  @override
+  Future<void> ackOfflineSync() async {}
+
   @override
   void dispose() {
     _autoTimer?.cancel();
@@ -84,6 +99,7 @@ class SimulatorHardwareService implements HardwareService {
     _repController.close();
     _speedController.close();
     _nfcController.close();
+    _offlineController.close();
   }
 
   // ── Debug controls ──────────────────────────────────────────────────────────
@@ -120,6 +136,11 @@ class SimulatorHardwareService implements HardwareService {
     if (uid.trim().isNotEmpty && !_nfcController.isClosed) {
       _nfcController.add(uid.trim().toLowerCase());
     }
+  }
+
+  /// Emits a buffered offline session as if the mat dumped it during a sync.
+  void emitOfflineSession(NfcOfflineSession session) {
+    if (!_offlineController.isClosed) _offlineController.add(session);
   }
 
   void setConnected(bool value) {

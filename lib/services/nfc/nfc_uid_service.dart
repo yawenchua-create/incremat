@@ -40,6 +40,15 @@ class NfcUidService {
     return doc.data()?['seniorId'] as String?;
   }
 
+  /// Streams the UIDs (hex doc ids) this caregiver has enrolled, so the mat's
+  /// offline roster can be kept in sync as cards are added/removed.
+  Stream<List<String>> watchUidsForCaregiver(String caregiverId) {
+    return _col
+        .where('caregiverId', isEqualTo: caregiverId)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.id).toList());
+  }
+
   /// Removes the mapping for a specific UID (e.g. when replacing a card).
   Future<void> removeByUid(String uid) => _col.doc(uid).delete();
 

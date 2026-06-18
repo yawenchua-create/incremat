@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/utils/rep_segmenter.dart';
 import 'hardware_provider.dart';
@@ -118,8 +119,8 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
   /// person's reps start at zero.
   void _onUserSwitch(String? newSeniorId) {
     final current = state;
-    // ignore: avoid_print
-    print('[SESSION] _onUserSwitch(reactive): new=$newSeniorId current=${current == null ? 'NULL' : 'senior=${current.seniorId} reps=${current.repCount}'}');
+    debugPrint('[LIVE] user switch -> $newSeniorId; outgoing session: '
+        '${current == null ? "none" : "${current.seniorId} (${current.repCount} reps)"}');
     if (current != null && current.seniorId != newSeniorId) {
       // Clear the live state synchronously so the new user's first rep starts a
       // fresh session; persist the finished one in the background.
@@ -190,14 +191,19 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
   /// Best-effort — never throws.
   Future<void> _finalizeSession(LiveSession session) async {
     final repo = ref.read(sessionRepositoryProvider(session.seniorId));
-    // ignore: avoid_print
-    print('[SESSION] _finalizeSession: repo=${repo == null ? 'NULL' : 'ok'} reps=${session.repCount}');
-    if (repo == null) return;
-    try {
-      final uid = ref.read(authStateProvider).valueOrNull?.uid;
-      // ignore: avoid_print
-      print('[SESSION] _finalizeSession: uid=${uid ?? 'NULL'} willSave=${session.repCount > 0 && uid != null}');
-      if (session.repCount > 0 && uid != null) {
+    if (repo == null) {
+      debugPrint('[LIVE] finalize SKIPPED for ${session.seniorId}: no repo '
+          '(not authenticated?) — ${session.repCount} reps NOT saved');
+      return;
+    }
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (session.repCount > 0 && uid != null) {
+      // Keep these reps on the senior's home total until the persisted stream
+      // catches up, so the card doesn't momentarily drop to 0 on a user switch.
+      ref
+          .read(recentlyFinalizedProvider.notifier)
+          .remember(session.seniorId, session.repCount);
+      try {
         await repo
             .add(
               repCount: session.repCount,
@@ -207,12 +213,14 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
               recordedBy: uid,
             )
             .timeout(const Duration(seconds: 8));
-        // ignore: avoid_print
-        print('[SESSION] _finalizeSession: SAVED ok for ${session.seniorId}');
+        debugPrint('[LIVE] saved ${session.repCount} reps to ${session.seniorId}');
+      } catch (e) {
+        debugPrint('[LIVE] FAILED to save ${session.repCount} reps to '
+            '${session.seniorId}: $e');
       }
-    } catch (e) {
-      // ignore: avoid_print
-      print('[SESSION] _finalizeSession: SAVE FAILED: $e');
+    } else {
+      debugPrint('[LIVE] finalize for ${session.seniorId} wrote nothing '
+          '(reps=${session.repCount}, authed=${uid != null})');
     }
     // No longer in progress — stop publishing it as live to the play app.
     await repo
@@ -224,6 +232,36 @@ class LiveSessionNotifier extends Notifier<LiveSession?> {
   Future<void> flushNow() => _flush();
 }
 
-final liveSessionProvider = NotifierProvider<LiveSessionNotifier, LiveSession?>(
-  LiveSessionNotifier.new,
-);
+final liveSessionProvider =
+    NotifierProvider<LiveSessionNotifier, LiveSession?>(LiveSessionNotifier.new);
+
+/// Reps from a session that just ended (e.g. another user tapped in), recorded
+/// the moment it's persisted. [at] matches the saved session's timestamp.
+class FinalizedCarry {
+  final int reps;
+  final DateTime at;
+  const FinalizedCarry({required this.reps, required this.at});
+}
+
+/// Bridges the gap between a live session ending and Firestore's session stream
+/// reflecting the write. Insights keeps counting a carried entry until the saved
+/// record shows up in the stream, so a senior's total never blinks back to 0.
+class RecentFinalizedNotifier extends Notifier<Map<String, FinalizedCarry>> {
+  @override
+  Map<String, FinalizedCarry> build() => {};
+
+  void remember(String seniorId, int reps) {
+    final carry = FinalizedCarry(reps: reps, at: DateTime.now());
+    state = {...state, seniorId: carry};
+    // Safety net: drop it even if the write never lands, so it can't linger.
+    Future.delayed(const Duration(seconds: 20), () {
+      if (identical(state[seniorId], carry)) {
+        state = {...state}..remove(seniorId);
+      }
+    });
+  }
+}
+
+final recentlyFinalizedProvider =
+    NotifierProvider<RecentFinalizedNotifier, Map<String, FinalizedCarry>>(
+        RecentFinalizedNotifier.new);
