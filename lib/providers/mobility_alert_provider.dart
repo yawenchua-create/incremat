@@ -6,6 +6,16 @@ import '../models/session_log.dart';
 import '../services/notifications/notification_service.dart';
 import 'senior_provider.dart';
 
+// ════════════════════════════════════════════════════════════════════════════
+// MOBILITY DECLINE DETECTION — the app's clinical "early warning" feature.
+// A slowing 5-rep sit-to-stand time is an early sign of mobility/strength loss.
+// This file analyses each senior's recent 5XSST proxy times and, if they've
+// dropped sharply (in a day) or steadily (week-over-week), raises an alert and
+// notifies the caregiver. The analysis (analyseMobility) is a PURE FUNCTION —
+// no side effects, output depends only on input — which makes it easy to unit
+// test and lets the provider just feed sessions into it.
+// ════════════════════════════════════════════════════════════════════════════
+
 /// What kind of decline in the 5-rep sit-to-stand time we detected.
 enum MobilityAlertKind { none, dayDrop, weekDrop }
 
@@ -50,6 +60,10 @@ const double _weekRatioThreshold = 1.15;
 
 DateTime _dayKey(DateTime t) => DateTime(t.year, t.month, t.day);
 
+// Statistics helpers. We use the MEDIAN for the day baseline because it ignores
+// outliers (one freak slow day won't skew it), and the MEAN for weekly averages.
+// `[...values]` makes a copy before sorting so we never mutate the caller's list;
+// `~/` is integer division; `.isOdd` picks the middle vs averaging the two middle.
 double _median(List<double> values) {
   if (values.isEmpty) return 0;
   final sorted = [...values]..sort();
@@ -164,6 +178,11 @@ String _signature(MobilityAlert a, DateTime now) {
 /// app shell) so alerts fire even when the caregiver isn't on that senior's
 /// screen. Notification text is English to match the existing reminders.
 class MobilityAlertWatcher extends Notifier<void> {
+  // build() re-runs whenever the seniors list or any senior's alert changes
+  // (because it `ref.watch`es them). It's a "side-effecting watcher": rather than
+  // returning data, it reacts by firing notifications. The app shell watches this
+  // provider to keep it alive in the background. De-duplication (so the same
+  // event doesn't notify twice) is handled via a stored "signature" per event.
   @override
   void build() {
     final seniors = ref.watch(seniorsProvider);

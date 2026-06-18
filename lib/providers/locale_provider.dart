@@ -4,9 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Holds the app's active locale, persisted across launches. Defaults to
 /// English; the language toggle in Settings flips between English and 中文.
+/// `Locale('en')` / `Locale('zh')` are Flutter's language identifiers; MaterialApp
+/// watches this provider and re-renders the whole UI in the chosen language.
 class LocaleNotifier extends Notifier<Locale> {
   static const _key = 'app_locale';
 
+  // Same load-async-then-update pattern as SimulatorModeNotifier: start English,
+  // then swap to the saved language once SharedPreferences returns it.
   @override
   Locale build() {
     _load();

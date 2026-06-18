@@ -12,6 +12,12 @@ import '../insights/insights_screen.dart';
 import '../hardware/hardware_screen.dart';
 import '../settings/settings_screen.dart';
 
+/// The main app frame once signed in: the four bottom-tab screens (Home,
+/// Insights, Hardware, Settings) plus the bottom navigation bar.
+///
+/// It's a `ConsumerStatefulWidget` because it holds mutable state (`_currentIndex`)
+/// and observes the app lifecycle. `with WidgetsBindingObserver` mixes in the
+/// ability to hear OS events like "app backgrounded" (see didChangeAppLifecycleState).
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
@@ -21,8 +27,10 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
-  int _currentIndex = 0;
+  int _currentIndex = 0; // which tab is selected (0 = Home)
 
+  // The four tab screens. Held in an IndexedStack (below) so each KEEPS ITS
+  // STATE when you switch tabs — they're all built once and just shown/hidden.
   final _screens = const [
     HomeScreen(),
     InsightsScreen(),
@@ -47,10 +55,11 @@ class _MainShellState extends ConsumerState<MainShell>
     super.dispose();
   }
 
+  // OS lifecycle callback (thanks to WidgetsBindingObserver). When the app is
+  // backgrounded (paused) or being killed (detached), flush the in-progress
+  // session to Firestore so reps survive even if Android reclaims the app.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Persist any in-progress session when the app is backgrounded so reps
-    // aren't lost if the OS kills it.
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       ref.read(liveSessionProvider.notifier).flushNow();
@@ -87,6 +96,8 @@ class _MainShellState extends ConsumerState<MainShell>
     ];
 
     return Scaffold(
+      // IndexedStack shows only child[_currentIndex] but keeps all four alive,
+      // so scroll position / form input on each tab is preserved when switching.
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
@@ -109,7 +120,9 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 }
 
-// Shared app bar used across feature screens
+// Shared app bar reused across feature screens for a consistent header.
+// `implements PreferredSizeWidget` is required so it can be used as a Scaffold's
+// `appBar:` — that slot needs a widget that advertises its height (preferredSize).
 class IncrematAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;

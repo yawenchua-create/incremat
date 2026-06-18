@@ -6,6 +6,10 @@ import '../../l10n/app_localizations.dart';
 import '../../providers/senior_provider.dart';
 import '../../services/nfc/nfc_service.dart';
 
+/// Lets a SECONDARY caregiver link to an EXISTING senior — either by typing the
+/// join code another caregiver shared, or by scanning that senior's NFC card.
+/// Delegates the actual linking to the seniors notifier (connectSenior /
+/// connectSeniorByNfcUid). `_isConnecting`/`_isScanning` drive button spinners.
 class ConnectSeniorScreen extends ConsumerStatefulWidget {
   const ConnectSeniorScreen({super.key});
 

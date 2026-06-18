@@ -6,6 +6,10 @@ import '../../l10n/app_localizations.dart';
 import 'chair_stand_test_screen.dart';
 import 'nfc_write_sheet.dart';
 
+/// Success screen shown right after a senior is created. Displays the generated
+/// join code (with a tap-to-copy via `flutter/services` Clipboard) and offers
+/// next steps: run the baseline chair-stand test or enrol an NFC card. A
+/// StatelessWidget because it just shows the three values passed in.
 class SeniorAddedScreen extends StatelessWidget {
   final String seniorId;
   final String seniorName;

@@ -17,8 +17,13 @@ import '../seniors/chair_stand_test_screen.dart';
 import '../seniors/edit_senior_sheet.dart';
 import '../seniors/nfc_write_sheet.dart';
 
+/// The detailed dashboard for ONE senior (pushed when you tap their home card).
+/// Takes the `seniorId` as a constructor argument and shows their live rep
+/// count, mobility/chair-stand results, history, and actions (edit, run a
+/// chair-stand test, write an NFC card). Several editing actions open as bottom
+/// sheets (edit_senior_sheet, nfc_write_sheet).
 class SeniorDetailScreen extends ConsumerWidget {
-  final String seniorId;
+  final String seniorId; // passed in by whoever navigates here
   const SeniorDetailScreen({super.key, required this.seniorId});
 
   @override

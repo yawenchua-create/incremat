@@ -8,6 +8,10 @@ import '../../models/senior.dart';
 import '../../providers/senior_provider.dart';
 import 'sex_selector.dart';
 
+/// A bottom-sheet form for editing an existing senior's name/age/sex. Takes the
+/// current [Senior] so its controllers can be pre-filled (note `late final`
+/// controllers, initialised in initState from widget.senior). Saves via the
+/// seniors notifier's updateSenior.
 class EditSeniorSheet extends ConsumerStatefulWidget {
   final Senior senior;
   const EditSeniorSheet({super.key, required this.senior});

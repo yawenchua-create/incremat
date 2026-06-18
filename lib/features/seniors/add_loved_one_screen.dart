@@ -10,6 +10,10 @@ import '../../providers/senior_provider.dart';
 import 'senior_added_screen.dart';
 import 'sex_selector.dart';
 
+/// The "create a new senior profile" form (name, age, sex, daily rep goal).
+/// On submit it calls the seniors notifier to write the senior + generate a join
+/// code, then routes to [SeniorAddedScreen]. Same Form/controller pattern as the
+/// auth screens (see login_screen.dart). Note `_goalCtrl` pre-fills "25".
 class AddLovedOneScreen extends ConsumerStatefulWidget {
   const AddLovedOneScreen({super.key});
 

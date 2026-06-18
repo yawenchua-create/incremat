@@ -12,6 +12,11 @@ import '../../l10n/app_localizations.dart';
 import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 
+/// Lets the caregiver pick a date range and export a printable PDF progress
+/// report for a senior. The `pdf` package builds the document in code (note the
+/// `import 'package:pdf/widgets.dart' as pw` — those are PDF-specific widgets,
+/// NOT Flutter UI widgets), and `printing` hands it to the OS share/print sheet.
+/// Stats for the chosen range come from `reportStatsProvider`.
 class ExportReportScreen extends ConsumerStatefulWidget {
   const ExportReportScreen({super.key});
 

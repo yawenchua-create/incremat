@@ -1,7 +1,13 @@
 import 'dart:async';
 import 'hardware_service.dart';
 
+/// The simplest fake mat: always reports a healthy, connected device and never
+/// emits reps/NFC. Used for demo mode and widget tests where we just need a mat
+/// that "exists" without the interactive controls the SimulatorHardwareService
+/// offers. Like the other two, it `implements HardwareService` so it drops into
+/// the same provider slot interchangeably.
 class MockHardwareService implements HardwareService {
+  // A fixed, pre-built "everything's fine" status reused throughout.
   static const HardwareStatus _connectedStatus = HardwareStatus(
     isConnected: true,
     batteryPercent: 85,

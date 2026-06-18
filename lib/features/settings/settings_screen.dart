@@ -16,13 +16,22 @@ import '../session_music/session_music_screen.dart';
 import 'debug_screen.dart';
 import 'user_guide_screen.dart';
 
+/// The Settings tab: language, the selected-senior switcher, per-senior cards
+/// (rep goal, reminders, chair-stand test, music), the user guide / developer
+/// links, and sign-out. Each visual block is its own small private widget
+/// (`_LanguageCard`, `_RepGoalCard`, …) further down the file, composed here.
+///
+/// The page uses a `CustomScrollView` of "slivers" — slivers are scrollable
+/// pieces; `SliverToBoxAdapter` just wraps an ordinary widget so it can live in
+/// that scroll list. (A plain ListView would also work; slivers give finer
+/// control and better performance for long, mixed content.)
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final senior = ref.watch(selectedSeniorProvider);
+    final senior = ref.watch(selectedSeniorProvider); // the senior being configured
     final authState = ref.watch(authNotifierProvider);
 
     ref.listen(authNotifierProvider, (_, next) {

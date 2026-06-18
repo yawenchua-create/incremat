@@ -4,6 +4,16 @@ import 'auth_provider.dart';
 import 'live_session_provider.dart';
 import 'senior_provider.dart';
 
+// ════════════════════════════════════════════════════════════════════════════
+// INSIGHTS — turns the raw list of sessions into the numbers the dashboard
+// shows (today's reps, weekly bars, consistency %, monthly totals, latest 5-rep
+// time, etc.). The heavy lifting is in seniorInsightsProvider at the bottom: it
+// watches a senior's sessions + any live in-progress session and recomputes all
+// the stats whenever either changes. `.fold(0, (sum, s) => sum + s.repCount)` is
+// the standard "add up a list" reduction you'll see repeatedly below.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Immutable bundle of every stat the dashboard needs for one senior.
 class SeniorInsights {
   final double avgRepTimeSeconds;
   final double consistencyPercent;
@@ -57,9 +67,13 @@ class ReportStats {
       ReportStats(totalReps: 0, activeDays: 0, totalDays: 1, avgRepTimeSeconds: 0);
 }
 
+// A FutureProvider.family keyed by a RECORD `(String, DateTime, DateTime)` —
+// passing three values as the single family argument. FutureProvider (vs
+// StreamProvider) because a report is a one-time computed result, not a live feed.
 final reportStatsProvider =
     FutureProvider.family<ReportStats, (String, DateTime, DateTime)>(
         (ref, key) async {
+  // Destructure the record back into three named locals.
   final (seniorId, start, end) = key;
   final repo = ref.watch(sessionRepositoryProvider(seniorId));
   if (repo == null) return ReportStats.empty;
@@ -101,6 +115,11 @@ SeniorInsights _mockInsights() => SeniorInsights(
       latestFiveRepSeconds: 12.5,
     );
 
+/// The dashboard's data source. Recomputes all stats whenever the senior's
+/// monthly sessions OR the live session change (both are `ref.watch`ed), so the
+/// UI updates live as reps come in. Live reps are added ON TOP of the committed
+/// Firestore sessions so today's count climbs in real time before the session is
+/// even saved.
 final seniorInsightsProvider =
     Provider.family<SeniorInsights, String>((ref, seniorId) {
   final user = ref.watch(authStateProvider).valueOrNull;

@@ -2,8 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/sync_status.dart';
 import '../services/sync/sync_service.dart';
 
+// Exposes a single shared SyncService instance to the notifier below.
 final syncServiceProvider = Provider<SyncService>((ref) => SyncService());
 
+/// Drives the sync-status UI. Same loading-then-update trick as the other
+/// notifiers: return mock data instantly so the screen isn't blank, then swap in
+/// the real persisted status when it finishes loading.
 class SyncNotifier extends AsyncNotifier<SyncStatus> {
   @override
   Future<SyncStatus> build() async {

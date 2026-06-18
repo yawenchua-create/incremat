@@ -8,6 +8,11 @@ import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 import '../reports/export_report_screen.dart';
 
+/// INSIGHTS tab: charts and stats for the selected senior — the mobility (5-rep
+/// time) trend chart, weekly activity, consistency, monthly totals — plus a link
+/// to export a PDF report. Built from `seniorInsightsProvider` (see
+/// insights_provider.dart, which does all the number-crunching). `fl_chart` is
+/// the charting package. Each block below is a private `_Xxx` widget.
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
 

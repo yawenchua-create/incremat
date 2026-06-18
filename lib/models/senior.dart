@@ -1,20 +1,31 @@
 import '../core/utils/chair_stand.dart';
 
 /// One 30-Second Chair Stand Test result, kept as history for the monthly trend.
+/// `final` fields + a `const` constructor = an immutable value object: once
+/// built, it never changes (you make a new one instead of editing it).
 class ChairStandResult {
   final int reps;
   final DateTime at;
   const ChairStandResult(this.reps, this.at);
 }
 
+/// The core domain model for an elderly person being cared for ("a senior").
+///
+/// This is a classic Flutter immutable model with three companion methods you'll
+/// see on almost every model in this app:
+///   • [Senior.fromMap]  — build one FROM a Firestore document (deserialize)
+///   • [toMap]           — turn one INTO a Firestore document (serialize)
+///   • [copyWith]        — make a modified copy (since fields are `final`)
 class Senior {
-  final String id;
+  // All fields are `final` → immutable. `String?` (with `?`) means the value is
+  // nullable; a plain `String` can never be null.
+  final String id;                 // Firestore document id (not stored in the doc)
   final String name;
   final int age;
   final Sex sex;
-  final int dailyRepGoal;
-  final int consistencyThreshold;
-  final String? joinCode;
+  final int dailyRepGoal;          // target reps/day the caregiver set
+  final int consistencyThreshold;  // min active days/week to count as "consistent"
+  final String? joinCode;          // credential used to pair caregivers — sensitive
   final String? primaryCaregiverId;
   final String? photoUrl;
   // Latest 30-Second Chair Stand Test result (reps in 30s) and when it was
@@ -39,8 +50,15 @@ class Senior {
     this.chairStandHistory = const [],
   });
 
+  // A `factory` constructor builds a Senior from a raw Firestore map. Firestore
+  // hands back `Map<String, dynamic>` (untyped JSON-like data), so every field
+  // is defensively cast and given a fallback:
+  //   `(map['age'] as num?)?.toInt() ?? 0`
+  //    = read 'age', treat it as a nullable number, convert to int, and if it's
+  //      missing/null default to 0. This stops a malformed document from
+  //      crashing the app.
   factory Senior.fromMap(Map<String, dynamic> map, String id) => Senior(
-        id: id,
+        id: id, // the document id is passed in separately by the repository
         name: (map['name'] as String?) ?? '',
         age: (map['age'] as num?)?.toInt() ?? 0,
         sex: sexFromName(map['sex'] as String?),
@@ -54,6 +72,12 @@ class Senior {
             ? DateTime.fromMillisecondsSinceEpoch(
                 (map['chairStandTestAt'] as num).toInt())
             : null,
+        // Dates are stored as "milliseconds since 1970" (an int) because
+        // Firestore can't store a Dart DateTime directly; we convert back here.
+        // The history list is rebuilt item-by-item: .whereType<Map>() filters
+        // out anything that isn't a map, .map(...) converts each to a
+        // ChairStandResult, .toList() materialises it, and the cascade
+        // `..sort(...)` sorts oldest→newest in place before returning.
         chairStandHistory: ((map['chairStandHistory'] as List?) ?? [])
             .whereType<Map>()
             .map((e) => ChairStandResult(
@@ -65,10 +89,14 @@ class Senior {
           ..sort((a, b) => a.at.compareTo(b.at)),
       );
 
+  // The reverse of fromMap: produce the map we write to Firestore. Note `id`
+  // is NOT included (it's the document's key, not a field), and the
+  // `if (x != null) 'key': x` entries only add optional fields when they exist,
+  // keeping documents tidy.
   Map<String, dynamic> toMap() => {
         'name': name,
         'age': age,
-        'sex': sex.name,
+        'sex': sex.name, // store the enum as its string name, e.g. "female"
         'dailyRepGoal': dailyRepGoal,
         'consistencyThreshold': consistencyThreshold,
         if (joinCode != null) 'joinCode': joinCode,
@@ -82,6 +110,10 @@ class Senior {
             .toList(),
       };
 
+  // Because every field is `final`, you can't mutate a Senior. copyWith returns
+  // a NEW Senior identical to this one except for the named fields you pass.
+  // Pattern: `field: newValue ?? this.field` keeps the old value when the
+  // argument is omitted (null). e.g. `betty.copyWith(age: 72)`.
   Senior copyWith({
     String? name,
     int? age,
@@ -111,6 +143,8 @@ class Senior {
       );
 }
 
+// Demo data used only in logged-out/demo mode so the UI has something to show
+// without a real account. Never written to real caregiver accounts.
 class MockSeniors {
   static final betty = Senior(
     id: 'senior_betty_001',

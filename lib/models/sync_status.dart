@@ -1,7 +1,9 @@
+/// A small immutable snapshot of the data-sync state, shown in the UI (e.g. a
+/// "Last synced 5m ago • 3 pending" banner). Produced by the sync provider.
 class SyncStatus {
-  final DateTime? lastSyncedAt;
-  final int pendingSessions;
-  final bool isSyncing;
+  final DateTime? lastSyncedAt;  // null = has never synced
+  final int pendingSessions;     // writes still waiting to reach the server
+  final bool isSyncing;          // a sync is in progress right now
 
   const SyncStatus({
     this.lastSyncedAt,
@@ -20,6 +22,8 @@ class SyncStatus {
         isSyncing: isSyncing ?? this.isSyncing,
       );
 
+  // Turns the raw timestamp into a friendly relative label like "Just now",
+  // "5m ago", "3h ago", "2d ago" by bucketing the elapsed Duration.
   String get lastSyncedLabel {
     if (lastSyncedAt == null) return 'Never synced';
     final diff = DateTime.now().difference(lastSyncedAt!);

@@ -12,11 +12,19 @@ import '../../services/hardware/hardware_service.dart';
 import '../../services/nfc/nfc_service.dart';
 import '../../services/nfc/nfc_uid_service.dart';
 
+/// HARDWARE tab: the mat's connection/status panel and the "who's on the mat"
+/// NFC identification card. Shows live connection, battery and signal (or "—"
+/// when disconnected), the current live session's reps, and lets a caregiver
+/// tap an NFC card (phone or mat reader) to switch the active exerciser. The
+/// `_NfcIdentifyCard` lower down is where the awaited session-save-on-switch
+/// logic lives (see finalizeCurrentSession in live_session_provider.dart).
 class HardwareScreen extends ConsumerWidget {
   const HardwareScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Prefer the live stream value; fall back to the service's last-known status
+    // for the very first frame before the stream emits.
     final statusAsync = ref.watch(hardwareStatusProvider);
     final current = ref.watch(hardwareServiceProvider).currentStatus;
     final status = statusAsync.valueOrNull ?? current;

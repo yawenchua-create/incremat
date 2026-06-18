@@ -7,6 +7,9 @@ import '../../models/senior.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/senior_provider.dart';
 
+/// A bottom-sheet for MANUALLY logging a session (reps, avg time, 5-rep time)
+/// when the mat wasn't used — e.g. the caregiver counted by hand. Writes a
+/// SessionLog with source 'manual' (vs 'mat' for automatic ones).
 class RecordSessionSheet extends ConsumerStatefulWidget {
   final Senior senior;
   const RecordSessionSheet({super.key, required this.senior});

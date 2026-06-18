@@ -10,6 +10,11 @@ import '../seniors/add_loved_one_screen.dart';
 import '../seniors/connect_senior_screen.dart';
 import 'senior_detail_screen.dart';
 
+/// HOME tab: the caregiver's landing screen. Shows the list of seniors they
+/// care for (each as a summary card with today's progress), an empty state with
+/// "Add"/"Connect" actions when there are none, and routes into a senior's
+/// detail screen on tap. `seniorsStreamProvider` feeds it live data, so cards
+/// update the instant a session is logged.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -17,6 +22,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final seniorsAsync = ref.watch(seniorsStreamProvider);
+
+    // Local helper closures that push the respective screens onto the navigator.
 
     void onAddPerson() => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AddLovedOneScreen()),

@@ -18,6 +18,10 @@ class ChairStand {
   /// Age/sex-typical "normal" range of stands in 30s (Rikli & Jones norms):
   /// below [low] is below average (higher fall risk); above [high] is above
   /// average.
+  // Returns a Dart *record* `({int low, int high})` — a lightweight anonymous
+  // struct of two named fields, so callers write `range.low` / `range.high`
+  // without us defining a whole class. The nested `if (age >= ...)` ladders read
+  // the norm bands top-down; the first matching threshold wins.
   static ({int low, int high}) normalRange(int age, Sex sex) {
     switch (sex) {
       case Sex.male:

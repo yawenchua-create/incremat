@@ -12,12 +12,24 @@ import '../services/seniors/session_repository.dart';
 import 'auth_provider.dart';
 import 'notification_provider.dart';
 
+// ════════════════════════════════════════════════════════════════════════════
+// The central STATE HUB for seniors and their sessions. This file wires the
+// repositories (data layer) into providers (state layer) that screens watch.
+// Recurring idea: a provider returns `null`/mock data when logged out, and real
+// Firestore-backed data when authenticated — so demo mode "just works".
+// ════════════════════════════════════════════════════════════════════════════
+
+/// The repository for the LOGGED-IN caregiver, or null when signed out.
+/// `.valueOrNull` reads the current user out of the auth AsyncValue without
+/// throwing. Because it `ref.watch`es auth, it rebuilds on login/logout.
 final seniorRepositoryProvider = Provider<SeniorRepository?>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   return user != null ? SeniorRepository(user.uid) : null;
 });
 
-// Session repository no longer needs the caregiver uid — path is /seniors/{id}/sessions/.
+/// A session repository for a SPECIFIC senior. `Provider.family` = a provider
+/// parameterised by an argument (here the seniorId); calling
+/// `sessionRepositoryProvider('abc')` gives the repo for senior "abc".
 final sessionRepositoryProvider =
     Provider.family<SessionRepository?, String>((ref, seniorId) {
   final user = ref.watch(authStateProvider).valueOrNull;
@@ -40,9 +52,13 @@ final seniorsProvider = Provider<List<Senior>>((ref) {
 });
 
 // Holds the explicit senior ID selection; null = auto-select first.
+// It's PRIVATE (`_` prefix) so screens can't set it directly — they must go
+// through selectSenior() below, keeping selection logic in one place.
 final _selectedSeniorIdProvider = StateProvider<String?>((ref) => null);
 
-// Derives the active Senior object from the selection + seniors list.
+// Derives the active Senior object from the selection + seniors list. This is a
+// "computed" provider: it watches two others and recombines them, so it
+// recalculates whenever either the list or the selection changes.
 final selectedSeniorProvider = Provider<Senior?>((ref) {
   final seniors = ref.watch(seniorsProvider);
   if (seniors.isEmpty) return null;
@@ -106,7 +122,10 @@ final selectedTrackProvider =
 final randomizeTracksProvider =
     StateProvider.family<bool, String>((ref, _) => true);
 
-// Notifier for write operations (add / update / delete / connect).
+// Notifier for WRITE operations. Its state is `void` because it holds no data —
+// it's just a home for action methods the UI calls (add/update/delete/connect).
+// Each method grabs the repo with ref.read (one-off, no subscription) and
+// returns early if logged out (repo == null).
 class SeniorsNotifier extends Notifier<void> {
   @override
   void build() {}

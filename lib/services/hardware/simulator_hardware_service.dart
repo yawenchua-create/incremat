@@ -32,6 +32,9 @@ class SimulatorHardwareService implements HardwareService {
     _initTimer = Timer(const Duration(milliseconds: 200), _emitStatus);
   }
 
+  // Synthesises a status from the backing fields — the simulator's equivalent of
+  // the real service folding together battery/rssi/mat bytes. When not
+  // "connected" it returns the same all-zero disconnected status real BLE would.
   HardwareStatus _build() => _connected
       ? HardwareStatus(
           isConnected: true,
@@ -84,6 +87,10 @@ class SimulatorHardwareService implements HardwareService {
   }
 
   // ── Debug controls ──────────────────────────────────────────────────────────
+  // These extra methods/getters DON'T exist on HardwareService — they're only
+  // for the Developer screen, which holds a SimulatorHardwareService directly and
+  // calls them to fake reps, taps, battery, etc. The rest of the app, talking
+  // only to the interface, never sees them.
 
   int get reps => _reps;
   bool get isConnected => _connected;

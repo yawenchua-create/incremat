@@ -1,9 +1,14 @@
+/// One completed exercise session for a senior (a row of history).
+///
+/// Same immutable-model pattern as [Senior] (see senior.dart for the full
+/// explanation of fromMap / toMap / the defensive casts). Stored at
+/// `seniors/{seniorId}/sessions/{id}` in Firestore.
 class SessionLog {
   final String id;
   final String seniorId;
   final DateTime timestamp;
-  final int repCount;
-  final double avgRepTimeSeconds;
+  final int repCount;            // total reps done in this session
+  final double avgRepTimeSeconds; // average seconds per rep (a speed/quality cue)
   // Seconds to complete the first five reps of the session — the on-mat proxy
   // for the Five Times Sit-to-Stand Test (5XSST). 0 = not measured (fewer than
   // five reps, or a legacy session recorded before this was tracked).
@@ -26,7 +31,8 @@ class SessionLog {
     this.synced = false,
   });
 
-  /// Whether a valid 5-rep sit-to-stand time was captured for this session.
+  /// A computed/derived getter (no stored field): true when we captured a real
+  /// 5-rep time. Lets the UI decide whether to show the 5XSST result.
   bool get hasFiveRepTime => firstFiveRepsSeconds > 0;
 
   factory SessionLog.fromMap(Map<String, dynamic> map, String id) => SessionLog(
