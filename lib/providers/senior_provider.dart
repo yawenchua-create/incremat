@@ -68,6 +68,12 @@ final activeExerciserIdProvider = StateProvider<String?>((ref) => null);
 // pipeline ignores those reps instead of logging them as everyday exercise.
 final chairStandTestActiveProvider = StateProvider<bool>((ref) => false);
 
+/// [selectSenior] for callers holding a provider [Ref] rather than a WidgetRef
+/// (e.g. the hardware NFC coordinator reacting to a mat tap).
+void selectSeniorRef(Ref ref, String seniorId) {
+  ref.read(_selectedSeniorIdProvider.notifier).state = seniorId;
+}
+
 // Recent sessions stream per senior.
 final recentSessionsProvider =
     StreamProvider.family<List<SessionLog>, String>((ref, seniorId) {

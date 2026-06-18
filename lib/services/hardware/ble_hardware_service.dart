@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../../core/constants/ble_constants.dart';
 import 'hardware_service.dart';
@@ -7,11 +7,14 @@ import 'hardware_service.dart';
 class BleHardwareService implements HardwareService {
   BluetoothDevice? _device;
   BluetoothCharacteristic? _musicChar;
+  BluetoothCharacteristic? _nfcRosterChar;
+  BluetoothCharacteristic? _nfcOfflineChar;
 
   final _statusController = StreamController<HardwareStatus>.broadcast();
   final _repController = StreamController<int>.broadcast();
   final _speedController = StreamController<double>.broadcast();
   final _nfcController = StreamController<String>.broadcast();
+  final _offlineController = StreamController<NfcOfflineSession>.broadcast();
 
   HardwareStatus _current = HardwareStatus.disconnected;
 
@@ -21,19 +24,23 @@ class BleHardwareService implements HardwareService {
   StreamSubscription<List<int>>? _repCountSub;
   StreamSubscription<List<int>>? _repSpeedSub;
   StreamSubscription<List<int>>? _nfcScanSub;
+  StreamSubscription<List<int>>? _nfcOfflineSub;
   Timer? _rssiTimer;
 
   @override
   Stream<HardwareStatus> get statusStream => _statusController.stream;
 
   @override
-  Stream<String> get nfcUidStream => _nfcController.stream;
-
-  @override
   Stream<int> get repCountStream => _repController.stream;
 
   @override
   Stream<double> get avgRepTimeStream => _speedController.stream;
+
+  @override
+  Stream<String> get nfcUidStream => _nfcController.stream;
+
+  @override
+  Stream<NfcOfflineSession> get offlineSessionStream => _offlineController.stream;
 
   @override
   HardwareStatus get currentStatus => _current;
@@ -91,6 +98,8 @@ class BleHardwareService implements HardwareService {
     for (final service in services) {
       if (service.uuid.toString().toLowerCase() ==
           BleConstants.serviceUuid.toLowerCase()) {
+        debugPrint('[NFC] found IncreMat service; characteristics: '
+            '${service.characteristics.map((c) => c.uuid.toString()).join(", ")}');
         for (final char in service.characteristics) {
           final uuid = char.uuid.toString().toLowerCase();
           if (uuid == BleConstants.repCountCharUuid.toLowerCase()) {
@@ -110,6 +119,13 @@ class BleHardwareService implements HardwareService {
           } else if (uuid == BleConstants.nfcScanCharUuid.toLowerCase()) {
             await char.setNotifyValue(true);
             _nfcScanSub = char.onValueReceived.listen(_onNfcScanData);
+            debugPrint('[NFC] subscribed to NFC-scan characteristic');
+          } else if (uuid == BleConstants.nfcRosterCharUuid.toLowerCase()) {
+            _nfcRosterChar = char;
+          } else if (uuid == BleConstants.nfcOfflineCharUuid.toLowerCase()) {
+            await char.setNotifyValue(true);
+            _nfcOfflineChar = char;
+            _nfcOfflineSub = char.onValueReceived.listen(_onOfflineData);
           }
         }
       }
@@ -150,13 +166,6 @@ class BleHardwareService implements HardwareService {
     _statusController.add(_current);
   }
 
-  // NFC_SCAN char — mat sends the tapped card's UID as a UTF-8 hex string.
-  void _onNfcScanData(List<int> data) {
-    if (data.isEmpty) return;
-    final uid = String.fromCharCodes(data).trim().toLowerCase();
-    if (uid.isNotEmpty) _nfcController.add(uid);
-  }
-
   void _onMatPlacedData(List<int> data) {
     if (data.isEmpty) return;
     _current = HardwareStatus(
@@ -166,6 +175,73 @@ class BleHardwareService implements HardwareService {
       isMatOnChair: data[0] == 1,
     );
     _statusController.add(_current);
+  }
+
+  // [uidLen][uid bytes] — a card tapped on the mat while we're connected.
+  void _onNfcScanData(List<int> data) {
+    debugPrint('[NFC] scan notify received: $data');
+    if (data.isEmpty) return;
+    final len = data[0];
+    if (len == 0 || data.length < 1 + len) return;
+    _nfcController.add(_bytesToHex(data.sublist(1, 1 + len)));
+  }
+
+  // [uidLen][uid bytes][reps u16 LE][durationMs u32 LE] — one buffered session.
+  void _onOfflineData(List<int> data) {
+    if (data.isEmpty) return;
+    final len = data[0];
+    if (len == 0 || data.length < 1 + len + 2 + 4) return;
+    var i = 1;
+    final uid = data.sublist(i, i + len);
+    i += len;
+    final reps = data[i] | (data[i + 1] << 8);
+    i += 2;
+    final durationMs = data[i] |
+        (data[i + 1] << 8) |
+        (data[i + 2] << 16) |
+        (data[i + 3] << 24);
+    _offlineController.add(NfcOfflineSession(
+      uidHex: _bytesToHex(uid),
+      reps: reps,
+      durationMs: durationMs,
+    ));
+  }
+
+  // Lowercase hex, matching NfcService.bytesToHex so UIDs line up with `nfc_uids`.
+  static String _bytesToHex(List<int> bytes) =>
+      bytes.map((b) => (b & 0xFF).toRadixString(16).padLeft(2, '0')).join();
+
+  static List<int> _hexToBytes(String hex) {
+    final out = <int>[];
+    for (var i = 0; i + 1 < hex.length; i += 2) {
+      out.add(int.parse(hex.substring(i, i + 2), radix: 16));
+    }
+    return out;
+  }
+
+  @override
+  Future<void> pushKnownUid(String uidHex) async {
+    final bytes = _hexToBytes(uidHex);
+    if (_nfcRosterChar == null || bytes.isEmpty || bytes.length > 7) return;
+    await _nfcRosterChar!.write([0x01, bytes.length, ...bytes]);
+  }
+
+  @override
+  Future<void> clearRoster() async {
+    if (_nfcRosterChar == null) return;
+    await _nfcRosterChar!.write([0x02]);
+  }
+
+  @override
+  Future<void> requestOfflineDump() async {
+    if (_nfcOfflineChar == null) return;
+    await _nfcOfflineChar!.write([0x20]);
+  }
+
+  @override
+  Future<void> ackOfflineSync() async {
+    if (_nfcOfflineChar == null) return;
+    await _nfcOfflineChar!.write([0x10]);
   }
 
   Future<void> _updateRssi() async {
@@ -191,14 +267,18 @@ class BleHardwareService implements HardwareService {
     _repCountSub?.cancel();
     _repSpeedSub?.cancel();
     _nfcScanSub?.cancel();
+    _nfcOfflineSub?.cancel();
     _connectionSub = null;
     _batterySub = null;
     _matPlacedSub = null;
     _repCountSub = null;
     _repSpeedSub = null;
     _nfcScanSub = null;
+    _nfcOfflineSub = null;
     await _device?.disconnect();
     _musicChar = null;
+    _nfcRosterChar = null;
+    _nfcOfflineChar = null;
     _current = HardwareStatus.disconnected;
     _statusController.add(_current);
   }
@@ -218,10 +298,12 @@ class BleHardwareService implements HardwareService {
     _repCountSub?.cancel();
     _repSpeedSub?.cancel();
     _nfcScanSub?.cancel();
+    _nfcOfflineSub?.cancel();
     _statusController.close();
     _repController.close();
     _speedController.close();
     _nfcController.close();
+    _offlineController.close();
     _device?.disconnect();
   }
 }

@@ -6,6 +6,7 @@ import 'features/auth/auth_wrapper.dart';
 import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/locale_provider.dart';
+import 'providers/nfc_identity_provider.dart';
 import 'services/notifications/notification_service.dart';
 
 void main() async {
@@ -23,9 +24,13 @@ class IncrematApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(localeProvider);
+    // Keep the mat NFC coordinator alive for the app's lifetime so taps switch
+    // the tracked senior and offline sessions sync regardless of the open screen.
+    ref.watch(nfcIdentityCoordinatorProvider);
     return MaterialApp(
       title: 'IncreMat Caregiver',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       theme: AppTheme.light,
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
