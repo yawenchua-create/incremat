@@ -4,7 +4,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/hardware_provider.dart';
+import '../../providers/senior_provider.dart';
 import '../../services/hardware/simulator_hardware_service.dart';
+import '../../services/notifications/notification_service.dart';
 
 /// Developer tools: drive a fake mat so the whole app can be tested without
 /// doing real reps on the hardware.
@@ -64,6 +66,9 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
                     ref.read(simulatorModeProvider.notifier).set(v),
               ),
             ),
+            // Notification preview — independent of the simulator, so it works
+            // whether or not a fake mat is running.
+            const _MobilityAlertCard(),
             // Gate on the persisted simMode (not the live service instance) so
             // the controls don't collapse during a service swap; show a stable
             // placeholder for the brief moment before the simulator is ready.
@@ -338,6 +343,58 @@ class _SpeedCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Fires a sample mobility-decline notification so the caregiver warning can be
+/// previewed on demand, without waiting for a real decline in the data.
+class _MobilityAlertCard extends ConsumerWidget {
+  const _MobilityAlertCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    return _debugCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle(l.devMobilityAlert),
+          Text(l.devMobilityAlertHint, style: AppTextStyles.caption),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.notifications_active_outlined, size: 18),
+              onPressed: () => _fire(context, ref),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              label: Text(l.devSendSampleAlert),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _fire(BuildContext context, WidgetRef ref) async {
+    // Attribute to the senior in view if there is one, else a placeholder so the
+    // preview works even before any senior is added.
+    final senior = ref.read(selectedSeniorProvider);
+    final id = senior?.id ?? 'sample-senior';
+    final name = senior?.name ?? 'Betty';
+    // Mirrors the real day-drop wording in MobilityAlertWatcher.
+    await NotificationService().showMobilityAlert(
+      id,
+      'Mobility check-in',
+      "$name's sit-to-stand was 32% slower than usual today. "
+          'Consider checking in.',
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).devSendSampleAlert)),
+      );
+    }
+  }
 }
 
 class _NfcCard extends StatelessWidget {
