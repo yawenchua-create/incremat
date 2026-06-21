@@ -3,6 +3,10 @@
 /// [HardwareService.statusStream] so the UI rebuilds.
 class HardwareStatus {
   final bool isConnected;
+  // -1 is a sentinel meaning "battery unknown" — we haven't received a real
+  // reading yet (or the firmware doesn't report it). This is deliberately
+  // different from a genuine 0%, so the UI can show "—" instead of a misleading
+  // "0%". Use [hasBattery] to tell them apart.
   final int batteryPercent;
   final int rssi;          // Received Signal Strength Indicator, in dBm.
                            // It's NEGATIVE: closer to 0 = stronger (−40 great,
@@ -25,9 +29,13 @@ class HardwareStatus {
                 ? 'Good'
                 : 'Weak';
 
+  /// True once a real battery reading (0–100) has arrived, so the UI knows
+  /// whether to show a percentage or "—".
+  bool get hasBattery => batteryPercent >= 0;
+
   static const HardwareStatus disconnected = HardwareStatus(
     isConnected: false,
-    batteryPercent: 0,
+    batteryPercent: -1, // unknown until a reading arrives
     rssi: -100,
     isMatOnChair: false,
   );

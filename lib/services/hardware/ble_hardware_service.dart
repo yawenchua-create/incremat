@@ -131,6 +131,12 @@ class BleHardwareService implements HardwareService {
   /// `onValueReceived.listen(...)` then handles each pushed packet of bytes.
   Future<void> _discoverAndSubscribe() async {
     if (_device == null) return;
+    // Kept so we can READ their current value once after connecting. Notify-only
+    // characteristics push a value only when it CHANGES, so without an initial
+    // read the mat could already be on the chair (or have a known battery level)
+    // and we'd never hear about it until it next changed.
+    BluetoothCharacteristic? matPlacedChar;
+    BluetoothCharacteristic? batteryChar;
     final services = await _device!.discoverServices();
     for (final service in services) {
       // Match our custom service UUID (case-insensitive — vendors vary on case).
@@ -152,9 +158,11 @@ class BleHardwareService implements HardwareService {
           } else if (uuid == BleConstants.batteryCharUuid.toLowerCase()) {
             await char.setNotifyValue(true);
             _batterySub = char.onValueReceived.listen(_onBatteryData);
+            batteryChar = char;
           } else if (uuid == BleConstants.matPlacedCharUuid.toLowerCase()) {
             await char.setNotifyValue(true);
             _matPlacedSub = char.onValueReceived.listen(_onMatPlacedData);
+            matPlacedChar = char;
           } else if (uuid == BleConstants.musicTrackCharUuid.toLowerCase()) {
             _musicChar = char;
           } else if (uuid == BleConstants.nfcScanCharUuid.toLowerCase()) {
@@ -179,6 +187,22 @@ class BleHardwareService implements HardwareService {
       isMatOnChair: _current.isMatOnChair,
     );
     _statusController.add(_current);
+
+    // Now pull the CURRENT value of the notify-only characteristics, so mat
+    // placement and battery reflect reality the moment we connect instead of
+    // waiting for the next change. Reuses the same decode handlers. Wrapped in
+    // try/catch because some firmware may not permit reads — falling back to the
+    // notify-on-change behaviour is harmless.
+    if (matPlacedChar != null) {
+      try {
+        _onMatPlacedData(await matPlacedChar.read());
+      } catch (_) {}
+    }
+    if (batteryChar != null) {
+      try {
+        _onBatteryData(await batteryChar.read());
+      } catch (_) {}
+    }
   }
 
   // BLE delivers raw BYTES (List<int>), so each handler must decode them per the

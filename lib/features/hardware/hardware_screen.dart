@@ -258,10 +258,12 @@ class _StatusCards extends StatelessWidget {
           Expanded(
             child: _InfoCard(
               icon: Icons.battery_charging_full_outlined,
-              label: connected
+              // Show a real % only once a reading has arrived; otherwise "—"
+              // (covers both disconnected and "connected but no battery data").
+              label: connected && status.hasBattery
                   ? l.batteryLabel(status.batteryPercent)
                   : l.batteryUnknown,
-              iconColor: connected
+              iconColor: connected && status.hasBattery
                   ? _batteryColor(status.batteryPercent)
                   : AppColors.subtleText,
             ),

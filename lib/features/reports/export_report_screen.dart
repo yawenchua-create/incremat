@@ -64,6 +64,10 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
   }
 
   Future<void> _shareReport() async {
+    // Capture these BEFORE any await so we don't touch context across an async
+    // gap (which is unsafe if the widget is disposed meanwhile).
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _isGenerating = true);
     try {
       final pdfBytes = await _buildPdf();
@@ -71,6 +75,15 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
         bytes: pdfBytes,
         filename: 'incremat_mobility_report_${DateFormat('yyyy_MM').format(_startDate)}.pdf',
       );
+    } catch (e) {
+      // Previously any failure here was swallowed — the button would spin
+      // briefly then do nothing. Now we surface it so the user (and we) know
+      // the export failed instead of it silently "not working".
+      // ignore: avoid_print
+      print('[REPORT] export failed: $e');
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l.reportExportFailed)));
+      }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
@@ -84,11 +97,18 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
         : null;
     final doc = pw.Document();
 
+    // Noto Sans SC (needed so Chinese text renders in the PDF) is fetched over
+    // the network at runtime and is several MB. Without a timeout a slow/absent
+    // connection would hang the export indefinitely (looks like "doesn't work").
+    // We cap the wait and fall back to built-in Helvetica — the report still
+    // generates; only CJK glyphs would be missing in that fallback case.
     late final pw.Font notoFont;
     late final pw.Font notoFontBold;
     try {
-      notoFont = await PdfGoogleFonts.notoSansSCRegular();
-      notoFontBold = await PdfGoogleFonts.notoSansSCBold();
+      notoFont = await PdfGoogleFonts.notoSansSCRegular()
+          .timeout(const Duration(seconds: 6));
+      notoFontBold = await PdfGoogleFonts.notoSansSCBold()
+          .timeout(const Duration(seconds: 6));
     } catch (_) {
       notoFont = pw.Font.helvetica();
       notoFontBold = pw.Font.helveticaBold();
