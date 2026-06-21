@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
@@ -10,11 +12,19 @@ import '../../services/hardware/hardware_service.dart';
 import '../../services/nfc/nfc_service.dart';
 import '../../services/nfc/nfc_uid_service.dart';
 
+/// HARDWARE tab: the mat's connection/status panel and the "who's on the mat"
+/// NFC identification card. Shows live connection, battery and signal (or "—"
+/// when disconnected), the current live session's reps, and lets a caregiver
+/// tap an NFC card (phone or mat reader) to switch the active exerciser. The
+/// `_NfcIdentifyCard` lower down is where the awaited session-save-on-switch
+/// logic lives (see finalizeCurrentSession in live_session_provider.dart).
 class HardwareScreen extends ConsumerWidget {
   const HardwareScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Prefer the live stream value; fall back to the service's last-known status
+    // for the very first frame before the stream emits.
     final statusAsync = ref.watch(hardwareStatusProvider);
     final current = ref.watch(hardwareServiceProvider).currentStatus;
     final status = statusAsync.valueOrNull ?? current;
@@ -26,24 +36,16 @@ class HardwareScreen extends ConsumerWidget {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _HardwareHeader()),
-            SliverToBoxAdapter(
-              child: _ConnectionBadge(status: status),
-            ),
+            SliverToBoxAdapter(child: _ConnectionBadge(status: status)),
             if (liveSession != null)
               SliverToBoxAdapter(
                 child: _LiveSessionCard(liveSession: liveSession),
               ),
             // NFC tap-to-identify so sessions are credited to the right user.
             SliverToBoxAdapter(child: _NfcIdentifyCard()),
-            const SliverToBoxAdapter(
-              child: _ChairIllustration(),
-            ),
-            SliverToBoxAdapter(
-              child: _StatusCards(status: status),
-            ),
-            SliverToBoxAdapter(
-              child: _ConnectButton(status: status),
-            ),
+            const SliverToBoxAdapter(child: _ChairIllustration()),
+            SliverToBoxAdapter(child: _StatusCards(status: status)),
+            SliverToBoxAdapter(child: _ConnectButton(status: status)),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
@@ -63,8 +65,10 @@ class _HardwareHeader extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AppLocalizations.of(context).hardwareTitle,
-                  style: AppTextStyles.headlineLarge),
+              Text(
+                AppLocalizations.of(context).hardwareTitle,
+                style: AppTextStyles.headlineLarge,
+              ),
               const SizedBox(height: 4),
               Text(
                 AppLocalizations.of(context).hardwareSubtitle,
@@ -87,10 +91,13 @@ class _HardwareHeader extends StatelessWidget {
               ],
             ),
             child: const Center(
-              child: Text('?',
-                  style: TextStyle(
-                      color: AppColors.subtleText,
-                      fontWeight: FontWeight.w600)),
+              child: Text(
+                '?',
+                style: TextStyle(
+                  color: AppColors.subtleText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -181,14 +188,15 @@ class _LiveSessionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.sageGreen.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.sageGreen.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.sageGreen.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.fitness_center_outlined,
-              size: 20, color: AppColors.sageGreen),
+          const Icon(
+            Icons.fitness_center_outlined,
+            size: 20,
+            color: AppColors.sageGreen,
+          ),
           const SizedBox(width: 12),
           Text(l.liveSessionLabel, style: AppTextStyles.titleMedium),
           Text(
@@ -235,6 +243,9 @@ class _StatusCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // No mat connected → there are no real readings, so show "—" rather than
+    // a misleading 0% / "Weak" that looks like live data.
+    final connected = status.isConnected;
     final signal = switch (status.signalLabel) {
       'Strong' => l.signalStrong,
       'Good' => l.signalGood,
@@ -247,16 +258,22 @@ class _StatusCards extends StatelessWidget {
           Expanded(
             child: _InfoCard(
               icon: Icons.battery_charging_full_outlined,
-              label: l.batteryLabel(status.batteryPercent),
-              iconColor: _batteryColor(status.batteryPercent),
+              // Show a real % only once a reading has arrived; otherwise "—"
+              // (covers both disconnected and "connected but no battery data").
+              label: connected && status.hasBattery
+                  ? l.batteryLabel(status.batteryPercent)
+                  : l.batteryUnknown,
+              iconColor: connected && status.hasBattery
+                  ? _batteryColor(status.batteryPercent)
+                  : AppColors.subtleText,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: _InfoCard(
               icon: Icons.signal_cellular_alt_outlined,
-              label: l.signalLabelText(signal),
-              iconColor: AppColors.sageGreen,
+              label: connected ? l.signalLabelText(signal) : l.signalUnknown,
+              iconColor: connected ? AppColors.sageGreen : AppColors.subtleText,
             ),
           ),
         ],
@@ -320,7 +337,10 @@ class _ConnectButton extends ConsumerWidget {
   }
 
   Future<void> _onTap(
-      BuildContext context, WidgetRef ref, bool isConnected) async {
+    BuildContext context,
+    WidgetRef ref,
+    bool isConnected,
+  ) async {
     final l = AppLocalizations.of(context);
     final service = ref.read(hardwareServiceProvider);
     ref.read(hardwareConnectingProvider.notifier).state = true;
@@ -332,9 +352,9 @@ class _ConnectButton extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.connectionFailed('$e'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.connectionFailed('$e'))));
       }
     } finally {
       ref.read(hardwareConnectingProvider.notifier).state = false;
@@ -355,6 +375,76 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
   bool _scanning = false;
   String? _statusMsg;
   bool _isError = false;
+  StreamSubscription<String>? _matNfcSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Subscribe to UIDs from the mat's NFC reader so a card tap there
+    // auto-identifies the user, identical to tapping the phone manually.
+    _subscribeMatNfc(ref.read(hardwareServiceProvider));
+  }
+
+  /// (Re)subscribes to the mat's NFC stream. Must run again whenever the
+  /// hardware service instance changes — toggling Simulator mode swaps the
+  /// service, and without re-subscribing we'd keep listening to the old,
+  /// disposed service and never hear real card taps again.
+  void _subscribeMatNfc(HardwareService service) {
+    _matNfcSub?.cancel();
+    _matNfcSub = service.nfcUidStream.listen(_onMatUid);
+  }
+
+  Future<void> _onMatUid(String uid) async {
+    if (!mounted) return;
+    setState(() {
+      _statusMsg = null;
+      _isError = false;
+    });
+    await _resolveUid(uid);
+  }
+
+  /// Shared lookup used by both the phone's NFC reader and the mat's reader.
+  Future<void> _resolveUid(String uid) async {
+    // Capture localizations before the await so we don't use context across
+    // an async gap.
+    final l = AppLocalizations.of(context);
+    final seniorId = await NfcUidService().lookup(uid);
+    if (!mounted) return;
+    if (seniorId == null) {
+      setState(() {
+        _scanning = false;
+        _statusMsg = l.cardNotRecognised;
+        _isError = true;
+      });
+      return;
+    }
+    final seniors = ref.read(seniorsProvider);
+    final match = seniors.where((s) => s.id == seniorId).firstOrNull;
+    if (match == null) {
+      setState(() {
+        _scanning = false;
+        _statusMsg = l.userNotInCircle;
+        _isError = true;
+      });
+      return;
+    }
+    // An NFC tap on the mat is an authoritative "this person is on the mat now"
+    // signal. Persist the OUTGOING person's in-progress session first — awaited,
+    // so it's actually logged before attribution changes — then switch both the
+    // view and the rep-attribution to the tapped person. (The reactive switch
+    // path persists in the background, which could be dropped mid-write.)
+    // ignore: avoid_print
+    print('[SESSION] NFC resolve -> switching to $seniorId; finalizing outgoing session first');
+    await ref.read(liveSessionProvider.notifier).finalizeCurrentSession();
+    if (!mounted) return;
+    selectSenior(ref, seniorId);
+    ref.read(activeExerciserIdProvider.notifier).state = seniorId;
+    setState(() {
+      _scanning = false;
+      _statusMsg = l.nowTracking(match.name);
+      _isError = false;
+    });
+  }
 
   Future<void> _identify() async {
     final l = AppLocalizations.of(context);
@@ -366,39 +456,20 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
       });
       return;
     }
-    setState(() { _scanning = true; _statusMsg = null; _isError = false; });
+    setState(() {
+      _scanning = true;
+      _statusMsg = null;
+      _isError = false;
+    });
     await NfcService.readUid(
-      onRead: (uid) async {
-        final seniorId = await NfcUidService().lookup(uid);
-        if (!mounted) return;
-        if (seniorId == null) {
-          setState(() {
-            _scanning = false;
-            _statusMsg = l.cardNotRecognised;
-            _isError = true;
-          });
-          return;
-        }
-        final seniors = ref.read(seniorsProvider);
-        final match = seniors.where((s) => s.id == seniorId).firstOrNull;
-        if (match == null) {
-          setState(() {
-            _scanning = false;
-            _statusMsg = l.userNotInCircle;
-            _isError = true;
-          });
-          return;
-        }
-        selectSenior(ref, seniorId);
-        setState(() {
-          _scanning = false;
-          _statusMsg = l.nowTracking(match.name);
-          _isError = false;
-        });
-      },
+      onRead: (uid) => _resolveUid(uid),
       onError: (msg) {
         if (mounted) {
-          setState(() { _scanning = false; _statusMsg = msg; _isError = true; });
+          setState(() {
+            _scanning = false;
+            _statusMsg = msg;
+            _isError = true;
+          });
         }
       },
     );
@@ -406,6 +477,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
 
   @override
   void dispose() {
+    _matNfcSub?.cancel();
     NfcService.stopSession().ignore();
     super.dispose();
   }
@@ -413,6 +485,12 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // Re-subscribe if the hardware service is swapped (e.g. Simulator mode
+    // toggled), so the mat's NFC reader keeps working without an app restart.
+    ref.listen<HardwareService>(
+      hardwareServiceProvider,
+      (_, next) => _subscribeMatNfc(next),
+    );
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       padding: const EdgeInsets.all(16),
@@ -439,10 +517,7 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(l.identifyUser, style: AppTextStyles.titleMedium),
-                    Text(
-                      l.identifyUserSubtitle,
-                      style: AppTextStyles.caption,
-                    ),
+                    Text(l.identifyUserSubtitle, style: AppTextStyles.caption),
                   ],
                 ),
               ),
@@ -466,17 +541,21 @@ class _NfcIdentifyCardState extends ConsumerState<_NfcIdentifyCard> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.sageGreen,
                 side: BorderSide(
-                    color: AppColors.sageGreen.withValues(alpha: 0.5)),
+                  color: AppColors.sageGreen.withValues(alpha: 0.5),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               icon: _scanning
                   ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.sageGreen),
+                        strokeWidth: 2,
+                        color: AppColors.sageGreen,
+                      ),
                     )
                   : const Icon(Icons.sensors, size: 18),
               label: Text(_scanning ? l.holdTagToPhone : l.scanNfcTag),
@@ -519,8 +598,10 @@ class _InfoCard extends StatelessWidget {
           Icon(icon, size: 20, color: iconColor),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(label,
-                style: AppTextStyles.titleMedium.copyWith(fontSize: 13)),
+            child: Text(
+              label,
+              style: AppTextStyles.titleMedium.copyWith(fontSize: 13),
+            ),
           ),
         ],
       ),

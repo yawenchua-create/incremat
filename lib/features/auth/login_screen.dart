@@ -9,6 +9,12 @@ import '../../providers/auth_provider.dart';
 import '../shell/main_shell.dart';
 import 'account_creation_screen.dart';
 
+/// Email/password sign-in screen. A good reference for how every FORM screen in
+/// this app is built:
+///   • a `GlobalKey<FormState>` to validate all fields at once,
+///   • a `TextEditingController` per field to read its text (disposed in dispose
+///     to avoid memory leaks),
+///   • `ref.listen` to react to auth results (navigate on success, toast on error).
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -17,20 +23,24 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();        // handle to the Form for validation
+  final _emailCtrl = TextEditingController();      // holds/streams the email field text
   final _passwordCtrl = TextEditingController();
-  bool _obscurePassword = true;
+  bool _obscurePassword = true;                    // password hidden by default
 
   @override
   void dispose() {
+    // Controllers own native resources; always dispose them with the State.
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    // `.validate()` runs every field's `validator`; returns false if any fail,
+    // in which case we stop and let the inline error messages show.
     if (!_formKey.currentState!.validate()) return;
+    // `.notifier` gets the AuthNotifier so we can call its signIn action.
     await ref.read(authNotifierProvider.notifier).signIn(
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
@@ -67,6 +77,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final l = AppLocalizations.of(context);
     final authState = ref.watch(authNotifierProvider);
 
+    // ref.listen (unlike ref.watch) runs a SIDE EFFECT on change rather than
+    // rebuilding the UI — the right tool for navigation/snackbars. Here: on auth
+    // error show a toast; on success replace the whole stack with MainShell
+    // (`pushAndRemoveUntil(..., (route)=>false)` clears all previous routes so
+    // the user can't "back" into the login screen).
     ref.listen(authNotifierProvider, (_, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -3,8 +3,13 @@ import 'package:flutter/services.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../l10n/app_localizations.dart';
+import 'chair_stand_test_screen.dart';
 import 'nfc_write_sheet.dart';
 
+/// Success screen shown right after a senior is created. Displays the generated
+/// join code (with a tap-to-copy via `flutter/services` Clipboard) and offers
+/// next steps: run the baseline chair-stand test or enrol an NFC card. A
+/// StatelessWidget because it just shows the three values passed in.
 class SeniorAddedScreen extends StatelessWidget {
   final String seniorId;
   final String seniorName;
@@ -100,6 +105,61 @@ class SeniorAddedScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              // Recommended first step: baseline fitness test to set the goal.
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ChairStandTestScreen(
+                      seniorId: seniorId,
+                      isInitial: true,
+                    ),
+                  ),
+                ),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.sageGreen.withValues(alpha: 0.18),
+                        AppColors.lightSage.withValues(alpha: 0.25),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.sageGreen.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.cardSurface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.event_seat_outlined,
+                            color: AppColors.sageGreen),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(l.chairStandIntroTitle,
+                                style: AppTextStyles.titleMedium),
+                            Text(l.chairStandBaselinePrompt(seniorName),
+                                style: AppTextStyles.caption),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right,
+                          color: AppColors.sageGreen, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               // Program their NFC tag right after creation.
               OutlinedButton.icon(
                 onPressed: () => NfcWriteSheet.show(

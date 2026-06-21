@@ -1,22 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/live_session_provider.dart';
+import '../../providers/mobility_alert_provider.dart';
+import '../../services/notifications/push_service.dart';
 import '../home/home_screen.dart';
 import '../insights/insights_screen.dart';
 import '../hardware/hardware_screen.dart';
 import '../settings/settings_screen.dart';
 
-class MainShell extends StatefulWidget {
+/// The main app frame once signed in: the four bottom-tab screens (Home,
+/// Insights, Hardware, Settings) plus the bottom navigation bar.
+///
+/// It's a `ConsumerStatefulWidget` because it holds mutable state (`_currentIndex`)
+/// and observes the app lifecycle. `with WidgetsBindingObserver` mixes in the
+/// ability to hear OS events like "app backgrounded" (see didChangeAppLifecycleState).
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
-  int _currentIndex = 0;
+class _MainShellState extends ConsumerState<MainShell>
+    with WidgetsBindingObserver {
+  int _currentIndex = 0; // which tab is selected (0 = Home)
 
+  // The four tab screens. Held in an IndexedStack (below) so each KEEPS ITS
+  // STATE when you switch tabs — they're all built once and just shown/hidden.
   final _screens = const [
     HomeScreen(),
     InsightsScreen(),
@@ -25,8 +39,39 @@ class _MainShellState extends State<MainShell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Register this device for push so decline / fitness-check reminders reach
+    // the caregiver even when the app is closed (delivered by the scheduled
+    // Cloud Function in functions/).
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid != null) PushService().register(uid);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // OS lifecycle callback (thanks to WidgetsBindingObserver). When the app is
+  // backgrounded (paused) or being killed (detached), flush the in-progress
+  // session to Firestore so reps survive even if Android reclaims the app.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      ref.read(liveSessionProvider.notifier).flushNow();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // Keep the mobility-decline watcher alive for the whole session so a
+    // caregiver is alerted even when not viewing the affected senior.
+    ref.watch(mobilityAlertWatcherProvider);
     final destinations = [
       NavigationDestination(
         icon: const Icon(Icons.home_outlined),
@@ -51,6 +96,8 @@ class _MainShellState extends State<MainShell> {
     ];
 
     return Scaffold(
+      // IndexedStack shows only child[_currentIndex] but keeps all four alive,
+      // so scroll position / form input on each tab is preserved when switching.
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
@@ -73,7 +120,9 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-// Shared app bar used across feature screens
+// Shared app bar reused across feature screens for a consistent header.
+// `implements PreferredSizeWidget` is required so it can be used as a Scaffold's
+// `appBar:` — that slot needs a widget that advertises its height (preferredSize).
 class IncrematAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;

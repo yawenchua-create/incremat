@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/auth_errors.dart';
+import '../../core/utils/chair_stand.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
 import '../../providers/auth_provider.dart';
@@ -10,16 +11,28 @@ import '../../providers/hardware_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/senior_provider.dart';
+import '../../providers/session_music_provider.dart';
 import '../auth/login_screen.dart';
 import '../session_music/session_music_screen.dart';
+import 'debug_screen.dart';
+import 'user_guide_screen.dart';
 
+/// The Settings tab: language, the selected-senior switcher, per-senior cards
+/// (rep goal, reminders, chair-stand test, music), the user guide / developer
+/// links, and sign-out. Each visual block is its own small private widget
+/// (`_LanguageCard`, `_RepGoalCard`, …) further down the file, composed here.
+///
+/// The page uses a `CustomScrollView` of "slivers" — slivers are scrollable
+/// pieces; `SliverToBoxAdapter` just wraps an ordinary widget so it can live in
+/// that scroll list. (A plain ListView would also work; slivers give finer
+/// control and better performance for long, mixed content.)
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final senior = ref.watch(selectedSeniorProvider);
+    final senior = ref.watch(selectedSeniorProvider); // the senior being configured
     final authState = ref.watch(authNotifierProvider);
 
     ref.listen(authNotifierProvider, (_, next) {
@@ -255,7 +268,8 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
   void initState() {
     super.initState();
     _goal = widget.senior.dailyRepGoal;
-    _sliderValue = _goal.clamp(5, 50).toDouble();
+    _sliderValue =
+        _goal.clamp(ChairStand.goalMin, ChairStand.goalMax).toDouble();
   }
 
   @override
@@ -264,7 +278,8 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
     final incoming = widget.senior.dailyRepGoal;
     if (_goal != incoming) {
       _goal = incoming;
-      _sliderValue = incoming.clamp(5, 50).toDouble();
+      _sliderValue =
+          incoming.clamp(ChairStand.goalMin, ChairStand.goalMax).toDouble();
     }
   }
 
@@ -325,9 +340,9 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
             ),
             child: Slider(
               value: _sliderValue,
-              min: 5,
-              max: 50,
-              divisions: 9,
+              min: ChairStand.goalMin.toDouble(),
+              max: ChairStand.goalMax.toDouble(),
+              divisions: (ChairStand.goalMax - ChairStand.goalMin) ~/ 5,
               onChanged: (v) => setState(() {
                 _sliderValue = v;
                 _goal = v.round();
@@ -351,10 +366,43 @@ class _RepGoalCardState extends ConsumerState<_RepGoalCard> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [5, 15, 25, 35, 50]
+              children: [5, 25, 50, 75, 100]
                   .map((v) => Text('$v', style: AppTextStyles.caption))
                   .toList(),
             ),
+          ),
+          _GoalCapacityHint(senior: widget.senior, goal: _goal),
+        ],
+      ),
+    );
+  }
+}
+
+/// Gentle caution if the daily goal is set well above the senior's measured
+/// 30CST capacity (more than ~2× the suggested starting goal).
+class _GoalCapacityHint extends StatelessWidget {
+  final Senior senior;
+  final int goal;
+  const _GoalCapacityHint({required this.senior, required this.goal});
+
+  @override
+  Widget build(BuildContext context) {
+    final reps = senior.chairStandReps;
+    if (reps == null) return const SizedBox.shrink();
+    final recommended = ChairStand.recommendedDailyGoal(reps);
+    if (goal <= recommended * 2) return const SizedBox.shrink();
+    final l = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 16, color: Color(0xFFD9A441)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(l.goalAboveCapacity(recommended),
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.subtleText)),
           ),
         ],
       ),
@@ -485,7 +533,9 @@ class _MusicCard extends ConsumerWidget {
   final Senior senior;
   const _MusicCard({required this.senior});
 
-  static const _tracks = ['甜蜜蜜', '半斤八两'];
+  // Derived from the single source of truth (kSongs) so every registered song
+  // appears here automatically — no need to also edit this list when adding one.
+  static final _tracks = kSongs.map((s) => s.id).toList();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -850,6 +900,22 @@ class _AccountSection extends StatelessWidget {
       ),
       child: Column(
         children: [
+          _SettingsTile(
+            icon: Icons.menu_book_outlined,
+            label: l.userGuide,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const UserGuideScreen()),
+            ),
+          ),
+          const Divider(height: 1, indent: 20, endIndent: 20),
+          _SettingsTile(
+            icon: Icons.developer_mode_outlined,
+            label: l.devSimulator,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DebugScreen()),
+            ),
+          ),
+          const Divider(height: 1, indent: 20, endIndent: 20),
           _SettingsTile(
             icon: Icons.person_outline,
             label: l.account,

@@ -1,19 +1,29 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import 'package:intl/intl.dart';
 import '../../l10n/app_localizations.dart';
+import '../../core/utils/chair_stand.dart';
 import '../../models/senior.dart';
 import '../../models/session_log.dart';
 import '../../providers/insights_provider.dart';
 import '../../providers/live_session_provider.dart';
+import '../../providers/mobility_alert_provider.dart';
 import '../../providers/senior_provider.dart';
+import '../seniors/chair_stand_test_screen.dart';
 import '../seniors/edit_senior_sheet.dart';
 import '../seniors/nfc_write_sheet.dart';
 
+/// The detailed dashboard for ONE senior (pushed when you tap their home card).
+/// Takes the `seniorId` as a constructor argument and shows their live rep
+/// count, mobility/chair-stand results, history, and actions (edit, run a
+/// chair-stand test, write an NFC card). Several editing actions open as bottom
+/// sheets (edit_senior_sheet, nfc_write_sheet).
 class SeniorDetailScreen extends ConsumerWidget {
-  final String seniorId;
+  final String seniorId; // passed in by whoever navigates here
   const SeniorDetailScreen({super.key, required this.seniorId});
 
   @override
@@ -68,7 +78,10 @@ class SeniorDetailScreen extends ConsumerWidget {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
+            SliverToBoxAdapter(child: _MobilityAlertBanner(senior: senior)),
             SliverToBoxAdapter(child: _TodayCard(senior: senior)),
+            SliverToBoxAdapter(child: _ChairStandCard(senior: senior)),
+            SliverToBoxAdapter(child: _SitToStandCard(senior: senior)),
             SliverToBoxAdapter(child: _WeekCalendar(seniorId: senior.id)),
             SliverToBoxAdapter(
               child: Padding(
@@ -449,6 +462,351 @@ class _SummaryTile extends StatelessWidget {
   }
 }
 
+/// A prominent warning shown when a senior's sit-to-stand speed has dropped.
+class _MobilityAlertBanner extends ConsumerWidget {
+  final Senior senior;
+  const _MobilityAlertBanner({required this.senior});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final alert = ref.watch(mobilityAlertProvider(senior.id));
+    if (!alert.isAlerting) return const SizedBox.shrink();
+
+    final body = alert.kind == MobilityAlertKind.dayDrop
+        ? l.mobilityDayDrop(senior.name, alert.percentSlower)
+        : l.mobilityWeekDrop(senior.name, alert.percentSlower);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.terracotta.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.terracotta.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: AppColors.terracotta, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.mobilityAlertHeading,
+                    style: AppTextStyles.titleMedium
+                        .copyWith(color: AppColors.terracotta)),
+                const SizedBox(height: 4),
+                Text(body, style: AppTextStyles.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Everyday sit-to-stand pace: the senior's usual time for 5 reps during
+/// sessions. A personal day-to-day trend — NOT a clinical test or rating.
+class _SitToStandCard extends ConsumerWidget {
+  final Senior senior;
+  const _SitToStandCard({required this.senior});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final insights = ref.watch(seniorInsightsProvider(senior.id));
+    final seconds = insights.latestFiveRepSeconds;
+    final measured = seconds > 0;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.lightSage.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.speed_outlined,
+                    size: 18, color: AppColors.sageGreen),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.fiveRepTitle, style: AppTextStyles.titleLarge),
+                    Text(l.fiveRepSubtitle, style: AppTextStyles.caption),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (measured)
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: seconds.toStringAsFixed(1),
+                    style: AppTextStyles.statMedium
+                        .copyWith(fontSize: 34, color: AppColors.sageGreen),
+                  ),
+                  TextSpan(
+                    text: ' ${l.secUnit}',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(l.doFiveReps, style: AppTextStyles.titleMedium),
+          const SizedBox(height: 8),
+          Text(l.fiveRepExplain, style: AppTextStyles.caption),
+        ],
+      ),
+    );
+  }
+}
+
+/// Latest 30-Second Chair Stand Test result + a prompt to (re)test when due.
+class _ChairStandCard extends StatelessWidget {
+  final Senior senior;
+  const _ChairStandCard({required this.senior});
+
+  void _startTest(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChairStandTestScreen(
+          seniorId: senior.id,
+          isInitial: senior.chairStandReps == null,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final reps = senior.chairStandReps;
+    final due = ChairStand.isRetestDue(senior.chairStandTestAt);
+    final rating =
+        reps != null ? ChairStand.rate(reps, senior.age, senior.sex) : null;
+
+    Color ratingColor = AppColors.sageGreen;
+    String ratingLabel = '';
+    switch (rating) {
+      case ChairStandRating.belowAverage:
+        ratingColor = AppColors.terracotta;
+        ratingLabel = l.belowAverage;
+      case ChairStandRating.average:
+        ratingColor = const Color(0xFFD9A441);
+        ratingLabel = l.average;
+      case ChairStandRating.aboveAverage:
+        ratingColor = AppColors.sageGreen;
+        ratingLabel = l.aboveAverage;
+      case null:
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(24),
+        border: due
+            ? Border.all(color: AppColors.sageGreen.withValues(alpha: 0.5))
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.espresso.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.lightSage.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.event_seat_outlined,
+                    size: 18, color: AppColors.sageGreen),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(l.chairStandCardTitle,
+                    style: AppTextStyles.titleLarge),
+              ),
+              if (reps != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: ratingColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(ratingLabel,
+                      style: AppTextStyles.caption.copyWith(
+                          color: ratingColor, fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (reps != null) ...[
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$reps',
+                    style: AppTextStyles.statMedium
+                        .copyWith(fontSize: 34, color: ratingColor),
+                  ),
+                  TextSpan(
+                    text: '  ${l.standsInThirtySeconds}',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              senior.chairStandTestAt != null
+                  ? l.chairStandLastTested(
+                      DateFormat('MMM d, yyyy').format(senior.chairStandTestAt!))
+                  : l.chairStandNeverTested,
+              style: AppTextStyles.caption,
+            ),
+            if (senior.chairStandHistory.length >= 2) ...[
+              const SizedBox(height: 12),
+              Text(l.chairStandTrend,
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.subtleText)),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 40,
+                child: LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(show: false),
+                    borderData: FlBorderData(show: false),
+                    titlesData: const FlTitlesData(
+                      leftTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      bottomTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: [
+                          for (var i = 0;
+                              i < senior.chairStandHistory.length;
+                              i++)
+                            FlSpot(i.toDouble(),
+                                senior.chairStandHistory[i].reps.toDouble())
+                        ],
+                        isCurved: true,
+                        color: AppColors.sageGreen,
+                        barWidth: 2,
+                        dotData: const FlDotData(show: true),
+                        belowBarData: BarAreaData(show: false),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ] else
+            Text(l.chairStandBaselinePrompt(senior.name),
+                style: AppTextStyles.bodySmall
+                    .copyWith(color: AppColors.subtleText)),
+          if (due) ...[
+            const SizedBox(height: 14),
+            if (reps != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.lightSage.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        size: 16, color: AppColors.sageGreen),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(l.chairStandDuePrompt(senior.name),
+                          style: AppTextStyles.caption),
+                    ),
+                  ],
+                ),
+              ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _startTest(context),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24)),
+                ),
+                icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                label: Text(
+                    reps == null ? l.chairStandDoTest : l.chairStandRetest,
+                    style: AppTextStyles.buttonText),
+              ),
+            ),
+          ] else if (reps != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _startTest(context),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(l.chairStandRetest),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _SessionsList extends ConsumerWidget {
   final String seniorId;
   const _SessionsList({required this.seniorId});
@@ -728,6 +1086,12 @@ class _SessionTile extends StatelessWidget {
                       session.avgRepTimeSeconds.toStringAsFixed(1)),
                   style: AppTextStyles.bodySmall,
                 ),
+                if (session.hasFiveRepTime)
+                  Text(
+                    '${l.fiveRepLabel}: ${l.secondsShort(session.firstFiveRepsSeconds.toStringAsFixed(1))}',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.sageGreen),
+                  ),
               ],
             ),
           ),

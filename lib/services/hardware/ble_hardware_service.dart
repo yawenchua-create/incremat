@@ -1,26 +1,48 @@
 import 'dart:async';
-import 'dart:typed_data';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+// flutter/foundation also re-exports ByteData/Uint8List (dart:typed_data) used
+// for parsing raw BLE bytes, plus debugPrint/kDebugMode.
+import 'package:flutter/foundation.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // the BLE plugin
 import '../../core/constants/ble_constants.dart';
 import 'hardware_service.dart';
 
+/// The REAL hardware driver: talks to the physical mat over Bluetooth Low
+/// Energy using the `flutter_blue_plus` package. `implements HardwareService`
+/// means it must provide every member the interface declares.
+///
+/// Lifecycle: connect() → scan → connect to device → discover GATT services →
+/// subscribe (setNotifyValue) to each characteristic → translate incoming bytes
+/// into Dart values → push them onto streams the app listens to.
 class BleHardwareService implements HardwareService {
-  BluetoothDevice? _device;
-  BluetoothCharacteristic? _musicChar;
+  BluetoothDevice? _device;             // the connected mat (null until connected)
+  BluetoothCharacteristic? _musicChar;  // the one characteristic we WRITE to
+  BluetoothCharacteristic? _nfcRosterChar;  // write: push known card UIDs to the mat
+  BluetoothCharacteristic? _nfcOfflineChar; // write: request/ack offline-session sync
 
+  // StreamControllers are the "write" end of each stream; `.stream` (below) is
+  // the "read" end the app subscribes to. `.broadcast()` allows MORE THAN ONE
+  // listener at a time (e.g. several widgets watching reps).
   final _statusController = StreamController<HardwareStatus>.broadcast();
   final _repController = StreamController<int>.broadcast();
   final _speedController = StreamController<double>.broadcast();
+  final _nfcController = StreamController<String>.broadcast();
+  final _offlineController = StreamController<NfcOfflineSession>.broadcast();
 
-  HardwareStatus _current = HardwareStatus.disconnected;
+  HardwareStatus _current = HardwareStatus.disconnected; // last status we built
 
+  // Handles to each BLE subscription/timer so we can cancel them on disconnect
+  // (otherwise they leak and keep firing). `?` = nullable; null when not active.
   StreamSubscription<BluetoothConnectionState>? _connectionSub;
   StreamSubscription<List<int>>? _batterySub;
   StreamSubscription<List<int>>? _matPlacedSub;
   StreamSubscription<List<int>>? _repCountSub;
   StreamSubscription<List<int>>? _repSpeedSub;
+  StreamSubscription<List<int>>? _nfcScanSub;
+  StreamSubscription<List<int>>? _nfcOfflineSub;
   Timer? _rssiTimer;
 
+  // Expose the READ end of each controller. `@override` confirms we're
+  // fulfilling a member declared in HardwareService.
   @override
   Stream<HardwareStatus> get statusStream => _statusController.stream;
 
@@ -31,47 +53,70 @@ class BleHardwareService implements HardwareService {
   Stream<double> get avgRepTimeStream => _speedController.stream;
 
   @override
+  Stream<String> get nfcUidStream => _nfcController.stream;
+
+  @override
+  Stream<NfcOfflineSession> get offlineSessionStream => _offlineController.stream;
+
+  @override
   HardwareStatus get currentStatus => _current;
 
+  /// Finds and connects to a nearby mat. `async` + `await` let us write the
+  /// step-by-step sequence as if it were synchronous; each `await` pauses until
+  /// that asynchronous step finishes.
   @override
   Future<void> connect(String deviceId) async {
     try {
-      // Request BLE on if needed (Android only — no-op on others).
+      // 1. Make sure the phone's Bluetooth radio is on (Android can prompt to
+      //    enable it; this is a no-op on iOS).
       if (await FlutterBluePlus.adapterState.first != BluetoothAdapterState.on) {
         await FlutterBluePlus.turnOn();
       }
 
+      // 2. SCAN. Devices that are advertising appear in `scanResults`. We listen
+      //    and grab the first hit. `found ??= x` assigns only if `found` is
+      //    still null, so we keep the first match and ignore later ones.
       ScanResult? found;
       final sub = FlutterBluePlus.scanResults.listen((results) {
         found ??= results.firstOrNull;
       });
 
+      // Only surface devices advertising the "IncreMat" name; stop after 15s.
       await FlutterBluePlus.startScan(
         withNames: [BleConstants.deviceNamePrefix],
         timeout: const Duration(seconds: BleConstants.scanTimeoutSeconds),
       );
+      // Wait until scanning flips back to false (i.e. the scan finished), then
+      // stop listening to scan results.
       await FlutterBluePlus.isScanning.where((s) => !s).first;
       sub.cancel();
 
       if (found == null) throw Exception('No IncreMat device found nearby');
 
+      // 3. CONNECT to the device we found (fails after 10s if it won't respond).
       _device = found!.device;
       await _device!.connect(
         timeout: const Duration(seconds: BleConstants.connectionTimeoutSeconds),
       );
 
+      // 4. Watch the link so we know if the mat drops out, then discover its
+      //    GATT table and subscribe to the data characteristics (next method).
       _connectionSub = _device!.connectionState.listen(_onConnectionState);
       await _discoverAndSubscribe();
 
-      // Poll RSSI every 5 s while connected.
+      // 5. BLE doesn't push signal strength, so poll it ourselves every 5s.
       _rssiTimer = Timer.periodic(const Duration(seconds: 5), (_) => _updateRssi());
     } catch (e) {
+      // Any failure above → report disconnected, then `rethrow` so the caller
+      // (the UI) can show an error message.
       _current = HardwareStatus.disconnected;
       _statusController.add(_current);
       rethrow;
     }
   }
 
+  // Called by the connectionState subscription whenever the link changes. If the
+  // mat disconnects (walked out of range, powered off), tear down and tell the UI.
   void _onConnectionState(BluetoothConnectionState state) {
     if (state == BluetoothConnectionState.disconnected) {
       _rssiTimer?.cancel();
@@ -80,14 +125,30 @@ class BleHardwareService implements HardwareService {
     }
   }
 
+  /// GATT discovery: ask the connected device for its services/characteristics,
+  /// find OUR service by UUID, then wire up each characteristic we recognise.
+  /// `setNotifyValue(true)` tells the mat "push me new values for this one";
+  /// `onValueReceived.listen(...)` then handles each pushed packet of bytes.
   Future<void> _discoverAndSubscribe() async {
     if (_device == null) return;
+    // Kept so we can READ their current value once after connecting. Notify-only
+    // characteristics push a value only when it CHANGES, so without an initial
+    // read the mat could already be on the chair (or have a known battery level)
+    // and we'd never hear about it until it next changed.
+    BluetoothCharacteristic? matPlacedChar;
+    BluetoothCharacteristic? batteryChar;
     final services = await _device!.discoverServices();
     for (final service in services) {
+      // Match our custom service UUID (case-insensitive — vendors vary on case).
       if (service.uuid.toString().toLowerCase() ==
           BleConstants.serviceUuid.toLowerCase()) {
+        debugPrint('[NFC] found IncreMat service; characteristics: '
+            '${service.characteristics.map((c) => c.uuid.toString()).join(", ")}');
         for (final char in service.characteristics) {
           final uuid = char.uuid.toString().toLowerCase();
+          // Route each characteristic to its handler by matching its UUID
+          // against the constants. Reps/speed/battery/mat/NFC = notify (read);
+          // music = the one we keep a handle to so we can WRITE to it later.
           if (uuid == BleConstants.repCountCharUuid.toLowerCase()) {
             await char.setNotifyValue(true);
             _repCountSub = char.onValueReceived.listen(_onRepCountData);
@@ -97,11 +158,23 @@ class BleHardwareService implements HardwareService {
           } else if (uuid == BleConstants.batteryCharUuid.toLowerCase()) {
             await char.setNotifyValue(true);
             _batterySub = char.onValueReceived.listen(_onBatteryData);
+            batteryChar = char;
           } else if (uuid == BleConstants.matPlacedCharUuid.toLowerCase()) {
             await char.setNotifyValue(true);
             _matPlacedSub = char.onValueReceived.listen(_onMatPlacedData);
+            matPlacedChar = char;
           } else if (uuid == BleConstants.musicTrackCharUuid.toLowerCase()) {
             _musicChar = char;
+          } else if (uuid == BleConstants.nfcScanCharUuid.toLowerCase()) {
+            await char.setNotifyValue(true);
+            _nfcScanSub = char.onValueReceived.listen(_onNfcScanData);
+            debugPrint('[NFC] subscribed to NFC-scan characteristic');
+          } else if (uuid == BleConstants.nfcRosterCharUuid.toLowerCase()) {
+            _nfcRosterChar = char;
+          } else if (uuid == BleConstants.nfcOfflineCharUuid.toLowerCase()) {
+            await char.setNotifyValue(true);
+            _nfcOfflineChar = char;
+            _nfcOfflineSub = char.onValueReceived.listen(_onOfflineData);
           }
         }
       }
@@ -114,20 +187,44 @@ class BleHardwareService implements HardwareService {
       isMatOnChair: _current.isMatOnChair,
     );
     _statusController.add(_current);
+
+    // Now pull the CURRENT value of the notify-only characteristics, so mat
+    // placement and battery reflect reality the moment we connect instead of
+    // waiting for the next change. Reuses the same decode handlers. Wrapped in
+    // try/catch because some firmware may not permit reads — falling back to the
+    // notify-on-change behaviour is harmless.
+    if (matPlacedChar != null) {
+      try {
+        _onMatPlacedData(await matPlacedChar.read());
+      } catch (_) {}
+    }
+    if (batteryChar != null) {
+      try {
+        _onBatteryData(await batteryChar.read());
+      } catch (_) {}
+    }
   }
 
-  // 2-byte little-endian uint16 = cumulative rep count this session.
+  // BLE delivers raw BYTES (List<int>), so each handler must decode them per the
+  // firmware's agreed format (documented in ble_constants.dart).
+  //
+  // Rep count: 2 bytes, little-endian uint16. "Little-endian" = the low byte
+  // comes first. To rebuild the number we keep data[0] as-is and shift data[1]
+  // left by 8 bits (×256), then OR them together:  count = low | (high << 8).
+  // e.g. bytes [44, 1] → 44 | (1<<8) → 44 | 256 → 300 reps.
   void _onRepCountData(List<int> data) {
-    if (data.length < 2) return;
+    if (data.length < 2) return; // ignore malformed/short packets
     final count = data[0] | (data[1] << 8);
-    _repController.add(count);
+    _repController.add(count); // push onto repCountStream
   }
 
-  // 4-byte little-endian float32 = avg rep time in seconds.
+  // Avg rep time: 4 bytes, little-endian float32. Bit-twiddling won't decode a
+  // float, so we wrap the 4 bytes in a ByteData view and ask for a Float32.
   void _onRepSpeedData(List<int> data) {
     if (data.length < 4) return;
     final bytes = ByteData.sublistView(Uint8List.fromList(data.sublist(0, 4)));
     final avgTime = bytes.getFloat32(0, Endian.little);
+    // Sanity gate: a rep between 0 and 60s is plausible; reject garbage values.
     if (avgTime > 0 && avgTime < 60) _speedController.add(avgTime.toDouble());
   }
 
@@ -153,6 +250,76 @@ class BleHardwareService implements HardwareService {
     _statusController.add(_current);
   }
 
+  // [uidLen][uid bytes] — a card tapped on the mat while we're connected.
+  void _onNfcScanData(List<int> data) {
+    debugPrint('[NFC] scan notify received: $data');
+    if (data.isEmpty) return;
+    final len = data[0];
+    if (len == 0 || data.length < 1 + len) return;
+    _nfcController.add(_bytesToHex(data.sublist(1, 1 + len)));
+  }
+
+  // [uidLen][uid bytes][reps u16 LE][durationMs u32 LE] — one buffered session.
+  void _onOfflineData(List<int> data) {
+    if (data.isEmpty) return;
+    final len = data[0];
+    if (len == 0 || data.length < 1 + len + 2 + 4) return;
+    var i = 1;
+    final uid = data.sublist(i, i + len);
+    i += len;
+    final reps = data[i] | (data[i + 1] << 8);
+    i += 2;
+    final durationMs = data[i] |
+        (data[i + 1] << 8) |
+        (data[i + 2] << 16) |
+        (data[i + 3] << 24);
+    _offlineController.add(NfcOfflineSession(
+      uidHex: _bytesToHex(uid),
+      reps: reps,
+      durationMs: durationMs,
+    ));
+  }
+
+  // Lowercase hex, matching NfcService.bytesToHex so UIDs line up with `nfc_uids`.
+  static String _bytesToHex(List<int> bytes) =>
+      bytes.map((b) => (b & 0xFF).toRadixString(16).padLeft(2, '0')).join();
+
+  static List<int> _hexToBytes(String hex) {
+    final out = <int>[];
+    for (var i = 0; i + 1 < hex.length; i += 2) {
+      out.add(int.parse(hex.substring(i, i + 2), radix: 16));
+    }
+    return out;
+  }
+
+  @override
+  Future<void> pushKnownUid(String uidHex) async {
+    final bytes = _hexToBytes(uidHex);
+    if (_nfcRosterChar == null || bytes.isEmpty || bytes.length > 7) return;
+    await _nfcRosterChar!.write([0x01, bytes.length, ...bytes]);
+  }
+
+  @override
+  Future<void> clearRoster() async {
+    if (_nfcRosterChar == null) return;
+    await _nfcRosterChar!.write([0x02]);
+  }
+
+  @override
+  Future<void> requestOfflineDump() async {
+    if (_nfcOfflineChar == null) return;
+    await _nfcOfflineChar!.write([0x20]);
+  }
+
+  @override
+  Future<void> ackOfflineSync() async {
+    if (_nfcOfflineChar == null) return;
+    await _nfcOfflineChar!.write([0x10]);
+  }
+
+  // Reads the live signal strength on demand (called by the 5s timer) and folds
+  // it into a fresh status. Wrapped in try/empty-catch because a read can fail
+  // transiently and we don't want that to crash the timer.
   Future<void> _updateRssi() async {
     if (_device == null || !_current.isConnected) return;
     try {
@@ -167,6 +334,9 @@ class BleHardwareService implements HardwareService {
     } catch (_) {}
   }
 
+  // Cleanly drop the connection: cancel every timer/subscription, null them out,
+  // disconnect the radio, and emit a disconnected status. (Cancelling matters —
+  // leftover subscriptions keep firing and leak memory/battery.)
   @override
   Future<void> disconnect() async {
     _rssiTimer?.cancel();
@@ -175,23 +345,34 @@ class BleHardwareService implements HardwareService {
     _matPlacedSub?.cancel();
     _repCountSub?.cancel();
     _repSpeedSub?.cancel();
+    _nfcScanSub?.cancel();
+    _nfcOfflineSub?.cancel();
     _connectionSub = null;
     _batterySub = null;
     _matPlacedSub = null;
     _repCountSub = null;
     _repSpeedSub = null;
+    _nfcScanSub = null;
+    _nfcOfflineSub = null;
     await _device?.disconnect();
     _musicChar = null;
+    _nfcRosterChar = null;
+    _nfcOfflineChar = null;
     _current = HardwareStatus.disconnected;
     _statusController.add(_current);
   }
 
+  // The only WRITE path: send a track name to the mat so it can sync music.
+  // `.codeUnits` turns the string into bytes; `withoutResponse: true` is a
+  // fire-and-forget write (faster, no acknowledgement) suited to non-critical data.
   @override
   Future<void> sendMusicTrack(String trackName) async {
     if (_musicChar == null) return;
     await _musicChar!.write(trackName.codeUnits, withoutResponse: true);
   }
 
+  // Final teardown when the service itself is thrown away: cancel subscriptions
+  // AND close the StreamControllers (a closed stream can never be reopened).
   @override
   void dispose() {
     _rssiTimer?.cancel();
@@ -200,9 +381,13 @@ class BleHardwareService implements HardwareService {
     _matPlacedSub?.cancel();
     _repCountSub?.cancel();
     _repSpeedSub?.cancel();
+    _nfcScanSub?.cancel();
+    _nfcOfflineSub?.cancel();
     _statusController.close();
     _repController.close();
     _speedController.close();
+    _nfcController.close();
+    _offlineController.close();
     _device?.disconnect();
   }
 }

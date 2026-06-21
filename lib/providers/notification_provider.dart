@@ -44,10 +44,14 @@ final notificationTimeProvider =
   NotificationTimeNotifier.new,
 );
 
-// Per-senior enabled state, keyed by seniorId.
+// Per-senior "reminders on/off" state. `FamilyAsyncNotifier<bool, String>` =
+// an async notifier parameterised by a String (the seniorId), so each senior has
+// its own independent on/off value stored under its own SharedPreferences key.
 class NotificationsNotifier extends FamilyAsyncNotifier<bool, String> {
   static String _key(String seniorId) => 'notifications_enabled_$seniorId';
 
+  // build receives the family argument (seniorId) and returns that senior's
+  // saved preference (default false = off).
   @override
   Future<bool> build(String seniorId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -59,7 +63,7 @@ class NotificationsNotifier extends FamilyAsyncNotifier<bool, String> {
     required String seniorName,
     required int goalReps,
   }) async {
-    final seniorId = arg;
+    final seniorId = arg; // `arg` is the family parameter this instance was built with
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_key(seniorId), enabled);
     state = AsyncData(enabled);

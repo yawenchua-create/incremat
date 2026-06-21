@@ -4,7 +4,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/senior_provider.dart';
+import '../../services/nfc/nfc_service.dart';
 
+/// Lets a SECONDARY caregiver link to an EXISTING senior — either by typing the
+/// join code another caregiver shared, or by scanning that senior's NFC card.
+/// Delegates the actual linking to the seniors notifier (connectSenior /
+/// connectSeniorByNfcUid). `_isConnecting`/`_isScanning` drive button spinners.
 class ConnectSeniorScreen extends ConsumerStatefulWidget {
   const ConnectSeniorScreen({super.key});
 
@@ -15,11 +20,46 @@ class ConnectSeniorScreen extends ConsumerStatefulWidget {
 class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
   final _ctrl = TextEditingController();
   bool _isConnecting = false;
+  bool _isScanning = false;
 
   @override
   void dispose() {
+    NfcService.stopSession().ignore();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  /// Connects an existing senior by reading a card that's already enrolled to
+  /// them — no Play code needed.
+  Future<void> _scanCard() async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    if (!await NfcService.isAvailable()) {
+      messenger.showSnackBar(SnackBar(content: Text(l.nfcNotAvailable)));
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isScanning = true);
+    await NfcService.readUid(
+      onRead: (uid) async {
+        final error = await ref
+            .read(seniorsNotifierProvider.notifier)
+            .connectSeniorByNfcUid(uid, l);
+        if (!mounted) return;
+        setState(() => _isScanning = false);
+        if (error != null) {
+          messenger.showSnackBar(SnackBar(content: Text(error)));
+        } else {
+          nav.popUntil((r) => r.isFirst);
+        }
+      },
+      onError: (msg) {
+        if (!mounted) return;
+        setState(() => _isScanning = false);
+        messenger.showSnackBar(SnackBar(content: Text(msg)));
+      },
+    );
   }
 
   Future<void> _connect() async {
@@ -99,6 +139,45 @@ class _ConnectSeniorScreenState extends ConsumerState<ConnectSeniorScreen> {
                             strokeWidth: 2, color: Colors.white),
                       )
                     : Text(l.connect, style: AppTextStyles.buttonText),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(l.orConnectWord,
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.subtleText)),
+                  ),
+                  const Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: (_isConnecting || _isScanning) ? null : _scanCard,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.sageGreen,
+                  minimumSize: const Size(double.infinity, 56),
+                  side: BorderSide(
+                      color: AppColors.sageGreen.withValues(alpha: 0.5)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                ),
+                icon: _isScanning
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.sageGreen),
+                      )
+                    : const Icon(Icons.nfc, size: 22),
+                label: Text(
+                  _isScanning ? l.holdCardToPhone : l.scanTheirCard,
+                  style: AppTextStyles.buttonText
+                      .copyWith(color: AppColors.sageGreen),
+                ),
               ),
             ],
           ),

@@ -28,9 +28,12 @@ class SessionMusicScreen extends ConsumerWidget {
             const SizedBox(height: 18),
             _NowPlayingCard(state: s),
             const SizedBox(height: 24),
-            _LayersHeader(activeLayer: s.started ? s.layer : 0),
+            _LayersHeader(
+              activeLayer: s.started ? s.layer : 0,
+              layerCount: s.layerCount,
+            ),
             const SizedBox(height: 12),
-            for (int layer = 1; layer <= kLayerCount; layer++)
+            for (int layer = 1; layer <= s.layerCount; layer++)
               _LayerRow(
                 layer: layer,
                 state: s,
@@ -107,7 +110,11 @@ class _NowPlayingCard extends ConsumerWidget {
   String _titleText(AppLocalizations l) {
     if (state.ended) return l.musicSessionComplete;
     if (!state.started) return l.musicReadyWhenStarts;
-    return l.musicLayerTitle(state.layer, l.layerName(state.layer - 1));
+    // Name the layer by its actual stem (per song), not a fixed instrument list.
+    return l.musicLayerTitle(
+      state.layer,
+      l.layerNameForStem(state.stems[state.layer - 1]),
+    );
   }
 
   String _subtitle(AppLocalizations l) {
@@ -120,7 +127,7 @@ class _NowPlayingCard extends ConsumerWidget {
     if (!state.started) {
       return l.musicBeginsAutomatically;
     }
-    return l.musicStemsPlaying(state.layer, kLayerCount, state.reps);
+    return l.musicStemsPlaying(state.layer, state.layerCount, state.reps);
   }
 
   @override
@@ -180,8 +187,91 @@ class _NowPlayingCard extends ConsumerWidget {
             onRestart: notifier.restart,
             onStop: notifier.stop,
           ),
+          const SizedBox(height: 18),
+          _VolumeControl(volume: state.volume, onChanged: notifier.setMasterVolume),
         ],
       ),
+    );
+  }
+}
+
+/// Master volume slider that can push past 100% — above the phone's normal
+/// maximum — by applying a loudness boost, like Spotify's in-app volume.
+class _VolumeControl extends StatelessWidget {
+  const _VolumeControl({required this.volume, required this.onChanged});
+
+  final double volume;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final boosted = volume > 1.0;
+    final accent = boosted ? AppColors.terracotta : AppColors.sageGreen;
+    final pct = (volume * 100).round();
+    final icon = volume <= 0.001
+        ? Icons.volume_off_rounded
+        : boosted
+            ? Icons.volume_up_rounded
+            : volume < 0.5
+                ? Icons.volume_down_rounded
+                : Icons.volume_up_rounded;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 22, color: accent),
+            Expanded(
+              child: SliderTheme(
+                data: SliderThemeData(
+                  activeTrackColor: accent,
+                  inactiveTrackColor: AppColors.divider,
+                  thumbColor: accent,
+                  overlayColor: accent.withValues(alpha: 0.15),
+                  trackHeight: 4,
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 8),
+                ),
+                child: Slider(
+                  value: volume.clamp(0.0, kMaxVolume),
+                  min: 0.0,
+                  max: kMaxVolume,
+                  onChanged: onChanged,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 44,
+              child: Text(
+                '$pct%',
+                textAlign: TextAlign.right,
+                style: AppTextStyles.caption.copyWith(
+                  color: boosted ? AppColors.terracotta : AppColors.subtleText,
+                  fontWeight: boosted ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (boosted)
+          Padding(
+            padding: const EdgeInsets.only(left: 22, top: 2),
+            child: Row(
+              children: [
+                const Icon(Icons.graphic_eq_rounded,
+                    size: 13, color: AppColors.terracotta),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(l.musicBoostOn,
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.terracotta)),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -200,11 +290,11 @@ class _StatRow extends StatelessWidget {
         _divider(),
         _Stat(
             label: l.musicLayers,
-            value: state.started ? '${state.layer}/$kLayerCount' : '—'),
+            value: state.started ? '${state.layer}/${state.layerCount}' : '—'),
         _divider(),
         _Stat(
             label: l.musicNextLayer,
-            value: state.started && state.layer < kLayerCount
+            value: state.started && state.layer < state.layerCount
                 ? l.musicRepN(state.layer * state.repsPerLayer)
                 : (state.started ? l.musicFull : '—')),
       ],
@@ -402,9 +492,10 @@ class _PlayButton extends StatelessWidget {
 }
 
 class _LayersHeader extends StatelessWidget {
-  const _LayersHeader({required this.activeLayer});
+  const _LayersHeader({required this.activeLayer, required this.layerCount});
 
   final int activeLayer;
+  final int layerCount;
 
   @override
   Widget build(BuildContext context) {
@@ -415,7 +506,7 @@ class _LayersHeader extends StatelessWidget {
         Text(l.musicSessionLayers, style: AppTextStyles.headlineMedium),
         Text(
           activeLayer == 0
-              ? l.musicLayersCount(kLayerCount)
+              ? l.musicLayersCount(layerCount)
               : l.musicLayerActive(activeLayer),
           style: AppTextStyles.bodySmall,
         ),
@@ -486,11 +577,15 @@ class _LayerRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l.musicLayerTitle(layer, l.layerName(layer - 1)),
+                  l.musicLayerTitle(
+                    layer,
+                    l.layerNameForStem(state.stems[layer - 1]),
+                  ),
                   style: AppTextStyles.titleMedium,
                 ),
                 const SizedBox(height: 1),
-                Text(l.layerHint(layer - 1), style: AppTextStyles.bodySmall),
+                Text(l.layerHintForStem(state.stems[layer - 1]),
+                    style: AppTextStyles.bodySmall),
               ],
             ),
           ),

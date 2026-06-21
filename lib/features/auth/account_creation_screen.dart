@@ -9,6 +9,10 @@ import '../seniors/add_loved_one_screen.dart';
 import '../shell/main_shell.dart';
 import 'login_screen.dart';
 
+/// Sign-UP screen (new caregiver account). Structurally identical to
+/// [LoginScreen] — same Form + GlobalKey + controllers pattern — but it has an
+/// extra name field and calls `createAccount` instead of `signIn`. See
+/// login_screen.dart for the line-by-line explanation of the form mechanics.
 class AccountCreationScreen extends ConsumerStatefulWidget {
   const AccountCreationScreen({super.key});
 

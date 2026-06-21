@@ -12,6 +12,11 @@ import '../../l10n/app_localizations.dart';
 import '../../providers/insights_provider.dart';
 import '../../providers/senior_provider.dart';
 
+/// Lets the caregiver pick a date range and export a printable PDF progress
+/// report for a senior. The `pdf` package builds the document in code (note the
+/// `import 'package:pdf/widgets.dart' as pw` — those are PDF-specific widgets,
+/// NOT Flutter UI widgets), and `printing` hands it to the OS share/print sheet.
+/// Stats for the chosen range come from `reportStatsProvider`.
 class ExportReportScreen extends ConsumerStatefulWidget {
   const ExportReportScreen({super.key});
 
@@ -59,6 +64,10 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
   }
 
   Future<void> _shareReport() async {
+    // Capture these BEFORE any await so we don't touch context across an async
+    // gap (which is unsafe if the widget is disposed meanwhile).
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _isGenerating = true);
     try {
       final pdfBytes = await _buildPdf();
@@ -66,6 +75,15 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
         bytes: pdfBytes,
         filename: 'incremat_mobility_report_${DateFormat('yyyy_MM').format(_startDate)}.pdf',
       );
+    } catch (e) {
+      // Previously any failure here was swallowed — the button would spin
+      // briefly then do nothing. Now we surface it so the user (and we) know
+      // the export failed instead of it silently "not working".
+      // ignore: avoid_print
+      print('[REPORT] export failed: $e');
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l.reportExportFailed)));
+      }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
@@ -79,11 +97,18 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
         : null;
     final doc = pw.Document();
 
+    // Noto Sans SC (needed so Chinese text renders in the PDF) is fetched over
+    // the network at runtime and is several MB. Without a timeout a slow/absent
+    // connection would hang the export indefinitely (looks like "doesn't work").
+    // We cap the wait and fall back to built-in Helvetica — the report still
+    // generates; only CJK glyphs would be missing in that fallback case.
     late final pw.Font notoFont;
     late final pw.Font notoFontBold;
     try {
-      notoFont = await PdfGoogleFonts.notoSansSCRegular();
-      notoFontBold = await PdfGoogleFonts.notoSansSCBold();
+      notoFont = await PdfGoogleFonts.notoSansSCRegular()
+          .timeout(const Duration(seconds: 6));
+      notoFontBold = await PdfGoogleFonts.notoSansSCBold()
+          .timeout(const Duration(seconds: 6));
     } catch (_) {
       notoFont = pw.Font.helvetica();
       notoFontBold = pw.Font.helveticaBold();
@@ -93,10 +118,16 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
     final espressoColor = PdfColor.fromHex('3E3636');
     final creamColor = PdfColor.fromHex('F7F3F0');
 
-    final totalReps = insights?.totalRepsThisMonth ?? 0;
-    final daysActive = insights?.daysActiveThisMonth ?? 0;
-    final totalDays = insights?.totalDaysThisMonth ?? 1;
-    final avgRepTime = insights?.avgRepTimeSeconds ?? 0.0;
+    final stats = senior != null
+        ? await ref
+            .read(reportStatsProvider((senior.id, _startDate, _endDate)).future)
+        : ReportStats.empty;
+    final totalReps = stats.totalReps;
+    final daysActive = stats.activeDays;
+    final totalDays = stats.totalDays;
+    final avgRepTime = stats.avgRepTimeSeconds;
+    final fiveRepTime = insights?.latestFiveRepSeconds ?? 0.0;
+    final chairStandReps = senior?.chairStandReps;
     final weeklyReps = insights?.weeklyReps ?? [];
 
     doc.addPage(
@@ -158,6 +189,30 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
               label: l.sitToStandSpeed,
               value: '${avgRepTime.toStringAsFixed(1)}s',
               sub: l.avgRepTimeThisMonth,
+              sageColor: sageColor,
+              espressoColor: espressoColor,
+            ),
+            pw.Divider(color: PdfColor.fromHex('E8E3DF')),
+            _pdfStatRow(
+              notoFont: notoFont,
+              notoFontBold: notoFontBold,
+              label: l.fiveRepReportLabel,
+              value: fiveRepTime > 0
+                  ? '${fiveRepTime.toStringAsFixed(1)}s'
+                  : l.notMeasured,
+              sub: l.fiveRepReportSub,
+              sageColor: sageColor,
+              espressoColor: espressoColor,
+            ),
+            pw.Divider(color: PdfColor.fromHex('E8E3DF')),
+            _pdfStatRow(
+              notoFont: notoFont,
+              notoFontBold: notoFontBold,
+              label: l.chairStandReportLabel,
+              value: chairStandReps != null
+                  ? l.chairStandStandsValue(chairStandReps)
+                  : l.notMeasured,
+              sub: l.chairStandReportSub,
               sageColor: sageColor,
               espressoColor: espressoColor,
             ),
@@ -252,10 +307,18 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
         ? ref.watch(seniorInsightsProvider(senior.id))
         : null;
 
-    final totalReps = insights?.totalRepsThisMonth ?? 0;
-    final daysActive = insights?.daysActiveThisMonth ?? 0;
-    final totalDays = insights?.totalDaysThisMonth ?? 1;
-    final avgRepTime = insights?.avgRepTimeSeconds ?? 0.0;
+    final stats = senior != null
+        ? (ref
+                .watch(reportStatsProvider((senior.id, _startDate, _endDate)))
+                .valueOrNull ??
+            ReportStats.empty)
+        : ReportStats.empty;
+    final totalReps = stats.totalReps;
+    final daysActive = stats.activeDays;
+    final totalDays = stats.totalDays;
+    final avgRepTime = stats.avgRepTimeSeconds;
+    final fiveRepTime = insights?.latestFiveRepSeconds ?? 0.0;
+    final chairStandReps = senior?.chairStandReps;
     final weeklyReps = insights?.weeklyReps ?? [];
 
     return Scaffold(
@@ -337,6 +400,24 @@ class _ExportReportScreenState extends ConsumerState<ExportReportScreen> {
                               label: l.sitToStandSpeed,
                               value: '${avgRepTime.toStringAsFixed(1)}s',
                               sub: l.avgRepTimeThisMonth,
+                            ),
+                            const Divider(),
+                            _ReportRow(
+                              icon: Icons.accessibility_new_outlined,
+                              label: l.fiveRepReportLabel,
+                              value: fiveRepTime > 0
+                                  ? '${fiveRepTime.toStringAsFixed(1)}s'
+                                  : l.notMeasured,
+                              sub: l.fiveRepReportSub,
+                            ),
+                            const Divider(),
+                            _ReportRow(
+                              icon: Icons.event_seat_outlined,
+                              label: l.chairStandReportLabel,
+                              value: chairStandReps != null
+                                  ? l.chairStandStandsValue(chairStandReps)
+                                  : l.notMeasured,
+                              sub: l.chairStandReportSub,
                             ),
                             const SizedBox(height: 20),
                             Text(l.weeklyRepetitions, style: AppTextStyles.titleMedium),

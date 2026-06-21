@@ -4,8 +4,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/senior.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/senior_provider.dart';
 
+/// A bottom-sheet for MANUALLY logging a session (reps, avg time, 5-rep time)
+/// when the mat wasn't used — e.g. the caregiver counted by hand. Writes a
+/// SessionLog with source 'manual' (vs 'mat' for automatic ones).
 class RecordSessionSheet extends ConsumerStatefulWidget {
   final Senior senior;
   const RecordSessionSheet({super.key, required this.senior});
@@ -18,12 +22,14 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
   final _formKey = GlobalKey<FormState>();
   final _repsCtrl = TextEditingController();
   final _timeCtrl = TextEditingController();
+  final _fiveRepCtrl = TextEditingController();
   bool _isSaving = false;
 
   @override
   void dispose() {
     _repsCtrl.dispose();
     _timeCtrl.dispose();
+    _fiveRepCtrl.dispose();
     super.dispose();
   }
 
@@ -36,6 +42,10 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
       await repo.add(
         repCount: int.parse(_repsCtrl.text.trim()),
         avgRepTimeSeconds: double.parse(_timeCtrl.text.trim()),
+        firstFiveRepsSeconds:
+            double.tryParse(_fiveRepCtrl.text.trim()) ?? 0.0,
+        source: 'manual',
+        recordedBy: ref.read(authStateProvider).valueOrNull?.uid,
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -113,6 +123,24 @@ class _RecordSessionSheetState extends ConsumerState<RecordSessionSheet> {
                   if (v == null || v.isEmpty) return l.enterAverageTime;
                   final n = double.tryParse(v);
                   if (n == null || n <= 0) return l.enterValidTime;
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _fiveRepCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                style: AppTextStyles.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: l.firstFiveTimeOptional,
+                  prefixIcon: const Icon(Icons.accessibility_new_outlined,
+                      color: AppColors.subtleText, size: 20),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null; // optional
+                  final n = double.tryParse(v.trim());
+                  if (n == null || n <= 0) return l.enterValidTimeOptional;
                   return null;
                 },
               ),

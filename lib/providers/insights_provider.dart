@@ -4,11 +4,19 @@ import 'auth_provider.dart';
 import 'live_session_provider.dart';
 import 'senior_provider.dart';
 
+// ════════════════════════════════════════════════════════════════════════════
+// INSIGHTS — turns the raw list of sessions into the numbers the dashboard
+// shows (today's reps, weekly bars, consistency %, monthly totals, latest 5-rep
+// time, etc.). The heavy lifting is in seniorInsightsProvider at the bottom: it
+// watches a senior's sessions + any live in-progress session and recomputes all
+// the stats whenever either changes. `.fold(0, (sum, s) => sum + s.repCount)` is
+// the standard "add up a list" reduction you'll see repeatedly below.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Immutable bundle of every stat the dashboard needs for one senior.
 class SeniorInsights {
-  final List<int> mobilityScores;
   final double avgRepTimeSeconds;
   final double consistencyPercent;
-  final double overallImprovementPercent;
   final int todayReps;
   final int yesterdayReps;
   final int daysActiveThisWeek;
@@ -16,15 +24,14 @@ class SeniorInsights {
   final int totalRepsThisMonth;
   final int daysActiveThisMonth;
   final int totalDaysThisMonth;
-  final double speedImprovementSeconds;
   final List<int> weeklyReps;
   final DateTime? lastSessionDate;
+  // Most recent everyday 5-rep sit-to-stand pace in seconds; 0 if never seen.
+  final double latestFiveRepSeconds;
 
   const SeniorInsights({
-    required this.mobilityScores,
     required this.avgRepTimeSeconds,
     required this.consistencyPercent,
-    required this.overallImprovementPercent,
     required this.todayReps,
     required this.yesterdayReps,
     required this.daysActiveThisWeek,
@@ -32,20 +39,70 @@ class SeniorInsights {
     required this.totalRepsThisMonth,
     required this.daysActiveThisMonth,
     required this.totalDaysThisMonth,
-    required this.speedImprovementSeconds,
     required this.weeklyReps,
     required this.lastSessionDate,
+    this.latestFiveRepSeconds = 0.0,
   });
 }
 
 bool _sameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+/// Stats computed over an explicit date range — used by the exportable report
+/// so the date-range picker actually filters the numbers.
+class ReportStats {
+  final int totalReps;
+  final int activeDays;
+  final int totalDays;
+  final double avgRepTimeSeconds;
+
+  const ReportStats({
+    required this.totalReps,
+    required this.activeDays,
+    required this.totalDays,
+    required this.avgRepTimeSeconds,
+  });
+
+  static const empty =
+      ReportStats(totalReps: 0, activeDays: 0, totalDays: 1, avgRepTimeSeconds: 0);
+}
+
+// A FutureProvider.family keyed by a RECORD `(String, DateTime, DateTime)` —
+// passing three values as the single family argument. FutureProvider (vs
+// StreamProvider) because a report is a one-time computed result, not a live feed.
+final reportStatsProvider =
+    FutureProvider.family<ReportStats, (String, DateTime, DateTime)>(
+        (ref, key) async {
+  // Destructure the record back into three named locals.
+  final (seniorId, start, end) = key;
+  final repo = ref.watch(sessionRepositoryProvider(seniorId));
+  if (repo == null) return ReportStats.empty;
+  final startDay = DateTime(start.year, start.month, start.day);
+  final endDay = DateTime(end.year, end.month, end.day, 23, 59, 59);
+  final sessions = await repo.getInRange(startDay, endDay);
+
+  final totalReps = sessions.fold(0, (s, e) => s + e.repCount);
+  final activeDays = sessions
+      .map((e) => DateTime(e.timestamp.year, e.timestamp.month, e.timestamp.day))
+      .toSet()
+      .length;
+  final totalDays = endDay.difference(startDay).inDays + 1;
+  final withSpeed = sessions.where((e) => e.avgRepTimeSeconds > 0).toList();
+  final avg = withSpeed.isEmpty
+      ? 0.0
+      : withSpeed.fold(0.0, (s, e) => s + e.avgRepTimeSeconds) / withSpeed.length;
+
+  return ReportStats(
+    totalReps: totalReps,
+    activeDays: activeDays,
+    totalDays: totalDays,
+    avgRepTimeSeconds: avg,
+  );
+});
+
 SeniorInsights _mockInsights() => SeniorInsights(
-      mobilityScores: MockSessionData.mobilityScoresW1toW12,
       avgRepTimeSeconds: MockSessionData.avgRepTimeSeconds,
       consistencyPercent: MockSessionData.consistencyPercent,
-      overallImprovementPercent: MockSessionData.overallImprovementPercent,
       todayReps: MockSessionData.todayReps,
       yesterdayReps: 6,
       daysActiveThisWeek: MockSessionData.daysActiveThisWeek,
@@ -53,11 +110,16 @@ SeniorInsights _mockInsights() => SeniorInsights(
       totalRepsThisMonth: MockSessionData.totalRepsThisMonth,
       daysActiveThisMonth: MockSessionData.daysActiveThisMonth,
       totalDaysThisMonth: MockSessionData.totalDaysThisMonth,
-      speedImprovementSeconds: MockSessionData.speedImprovementSeconds,
       weeklyReps: MockSessionData.weeklyReps,
       lastSessionDate: DateTime.now(),
+      latestFiveRepSeconds: 12.5,
     );
 
+/// The dashboard's data source. Recomputes all stats whenever the senior's
+/// monthly sessions OR the live session change (both are `ref.watch`ed), so the
+/// UI updates live as reps come in. Live reps are added ON TOP of the committed
+/// Firestore sessions so today's count climbs in real time before the session is
+/// even saved.
 final seniorInsightsProvider =
     Provider.family<SeniorInsights, String>((ref, seniorId) {
   final user = ref.watch(authStateProvider).valueOrNull;
@@ -74,11 +136,19 @@ final seniorInsightsProvider =
   final liveSession = ref.watch(liveSessionProvider);
   final liveReps = liveSession?.seniorId == seniorId ? (liveSession?.repCount ?? 0) : 0;
 
+  // Reps from a session that just ended (e.g. another user tapped in) stay counted
+  // until the saved record appears in the stream, so the total doesn't blink to 0.
+  final carry = ref.watch(recentlyFinalizedProvider)[seniorId];
+  final carryReflected =
+      carry != null && sessions.any((s) => !s.timestamp.isBefore(carry.at));
+  final carryReps = (carry != null && !carryReflected) ? carry.reps : 0;
+
   // Today's and yesterday's reps
   final todayReps = sessions
           .where((s) => _sameDay(s.timestamp, today))
           .fold(0, (sum, s) => sum + s.repCount) +
-      liveReps;
+      liveReps +
+      carryReps;
   final yesterday = today.subtract(const Duration(days: 1));
   final yesterdayReps = sessions
       .where((s) => _sameDay(s.timestamp, yesterday))
@@ -92,9 +162,10 @@ final seniorInsightsProvider =
         .where((s) => _sameDay(s.timestamp, day))
         .fold(0, (sum, s) => sum + s.repCount);
   });
-  // Include any in-progress live session in today's slot so active-day count is accurate.
+  // Include any in-progress live session (and just-finalized carry) in today's
+  // slot so active-day count and totals stay accurate during a user switch.
   final effectiveWeeklyReps = List<int>.from(weeklyReps);
-  if (liveReps > 0) effectiveWeeklyReps[today.weekday - 1] += liveReps;
+  effectiveWeeklyReps[today.weekday - 1] += liveReps + carryReps;
   final daysActiveThisWeek = effectiveWeeklyReps.where((r) => r > 0).length;
 
   // Weekly consistency: active days / days elapsed since first session this week.
@@ -135,11 +206,18 @@ final seniorInsightsProvider =
           .map((s) => s.timestamp)
           .reduce((a, b) => a.isAfter(b) ? a : b);
 
+  // Latest 5-rep sit-to-stand time: prefer an in-progress session that has
+  // already passed 5 reps, otherwise the most recent measured session.
+  final liveFiveRep =
+      (liveSession?.seniorId == seniorId && (liveSession?.firstFiveRepsSeconds ?? 0) > 0)
+          ? liveSession!.firstFiveRepsSeconds
+          : 0.0;
+  final measured = sessions.where((s) => s.hasFiveRepTime).toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  final latestFiveRepSeconds =
+      liveFiveRep > 0 ? liveFiveRep : (measured.isNotEmpty ? measured.first.firstFiveRepsSeconds : 0.0);
+
   return SeniorInsights(
-    // 12-week chart and trend deltas are mock until historical aggregation lands.
-    mobilityScores: MockSessionData.mobilityScoresW1toW12,
-    overallImprovementPercent: MockSessionData.overallImprovementPercent,
-    speedImprovementSeconds: MockSessionData.speedImprovementSeconds,
     avgRepTimeSeconds: avgRepTimeSeconds,
     consistencyPercent: consistencyPercent,
     todayReps: todayReps,
@@ -153,5 +231,6 @@ final seniorInsightsProvider =
     // lights up today's dot while a session is in progress.
     weeklyReps: effectiveWeeklyReps,
     lastSessionDate: lastSessionDate,
+    latestFiveRepSeconds: latestFiveRepSeconds,
   );
 });

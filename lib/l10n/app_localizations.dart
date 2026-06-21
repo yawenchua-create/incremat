@@ -73,14 +73,14 @@ class AppLocalizations {
   String get careBeginsWith => _t('Care begins with ', '关爱，始于');
   String get careBeginsYou => _t('you', '你');
   String get createAccountSubtitle => _t(
-      'Create your account to support,\nnurture, and make a difference.',
-      '创建账户，给予支持、\n呵护，带来改变。');
+    'Create your account to support,\nnurture, and make a difference.',
+    '创建账户，给予支持、\n呵护，带来改变。',
+  );
   String get name => _t('Name', '姓名');
   String get enterYourName => _t('Enter your name', '请输入姓名');
   String get minSixChars => _t('Minimum 6 characters', '至少 6 个字符');
   String get createAccount => _t('Create Account', '创建账户');
-  String get infoSafe =>
-      _t('Your information is safe with us.', '您的信息将安全保管。');
+  String get infoSafe => _t('Your information is safe with us.', '您的信息将安全保管。');
   String get haveAccountSignIn =>
       _t('Already have an account? Sign in', '已有账户？立即登录');
 
@@ -94,29 +94,34 @@ class AppLocalizations {
   String get errInvalidEmail =>
       _t('Please enter a valid email address.', '请输入有效的电子邮箱地址。');
   String get errUserDisabled => _t(
-      'This account has been disabled. Please contact support.',
-      '该账户已被停用，请联系支持。');
+    'This account has been disabled. Please contact support.',
+    '该账户已被停用，请联系支持。',
+  );
   String get errTooManyRequests => _t(
-      'Too many attempts. Please wait a moment and try again.',
-      '尝试次数过多，请稍后再试。');
-  String get errNoNetwork =>
-      _t('No internet connection. Please check your network.', '无网络连接，请检查您的网络。');
-  String get errRecentLogin => _t(
-      'Please sign in again before making this change.', '请重新登录后再进行此更改。');
+    'Too many attempts. Please wait a moment and try again.',
+    '尝试次数过多，请稍后再试。',
+  );
+  String get errNoNetwork => _t(
+    'No internet connection. Please check your network.',
+    '无网络连接，请检查您的网络。',
+  );
+  String get errRecentLogin =>
+      _t('Please sign in again before making this change.', '请重新登录后再进行此更改。');
   String get errGeneric =>
       _t('Something went wrong. Please try again.', '出了点问题，请重试。');
 
   // ── Home screen ─────────────────────────────────────────────────────────────
   String get yourLovedOnes => _t('Your Loved Ones', '您的亲人');
   String removePersonQ(String name) => _t('Remove $name?', '移除 $name？');
-  String get removeFromCircle => _t(
-      'This will remove them from your care circle.', '这会将其从您的关护圈中移除。');
+  String get removeFromCircle =>
+      _t('This will remove them from your care circle.', '这会将其从您的关护圈中移除。');
   String get remove => _t('Remove', '移除');
   String get addExistingSenior => _t('Add Existing Senior', '添加现有长者');
   String get noLovedOnes => _t('No loved ones yet', '还没有亲人');
   String get noLovedOnesSubtitle => _t(
-      'Add your first loved one to start\ntracking their sit-to-stand progress.',
-      '添加您的第一位亲人，\n开始记录他们的起坐进度。');
+    'Add your first loved one to start\ntracking their sit-to-stand progress.',
+    '添加您的第一位亲人，\n开始记录他们的起坐进度。',
+  );
   String get addALovedOne => _t('Add a Loved One', '添加亲人');
   String couldNotLoadSeniors(String msg) =>
       _t('Could not load seniors: $msg', '无法加载长者：$msg');
@@ -130,8 +135,7 @@ class AppLocalizations {
   String get avgTime => _t('Avg. Time', '平均时长');
   String secondsShort(String s) => _t('${s}s', '$s秒');
   String get thisWeek => _t('This Week', '本周');
-  String daysActiveOfWeek(int a, int b) =>
-      _t('$a of $b days', '$b 天中 $a 天');
+  String daysActiveOfWeek(int a, int b) => _t('$a of $b days', '$b 天中 $a 天');
   String get goalMet => _t('Goal met!', '已达标！');
   String get notStarted => _t('Not started', '未开始');
   String get keepGoing => _t('Keep going!', '继续加油！');
@@ -145,7 +149,10 @@ class AppLocalizations {
   String get dailyRepGoal => _t('Daily Rep Goal', '每日目标次数');
   String get enterAGoal => _t('Enter a goal', '请输入目标');
   String get goalBetween =>
-      _t('Enter a goal between 5 and 50', '请输入 5 到 50 之间的目标');
+      _t('Enter a goal between 5 and 100', '请输入 5 到 100 之间的目标');
+  String get sexLabel => _t('Sex (for fitness norms)', '性别（用于体能参照）');
+  String get male => _t('Male', '男');
+  String get female => _t('Female', '女');
   String get incrematPaired => _t('IncreMat Paired', 'IncreMat 已配对');
   String get pairIncreMat => _t('Pair IncreMat', '配对 IncreMat');
   String get connectedSuccessfully => _t('Connected successfully', '连接成功');
@@ -167,8 +174,7 @@ class AppLocalizations {
   String get numberOfReps => _t('Number of reps', '次数');
   String get enterRepCount => _t('Enter rep count', '请输入次数');
   String get enterValidNumber => _t('Enter a valid number', '请输入有效数字');
-  String get avgTimePerRep =>
-      _t('Avg. time per rep (seconds)', '每次平均时长（秒）');
+  String get avgTimePerRep => _t('Avg. time per rep (seconds)', '每次平均时长（秒）');
   String get enterAverageTime => _t('Enter average time', '请输入平均时长');
   String get enterValidTime => _t('Enter a valid time', '请输入有效时长');
   String get saveSession => _t('Save Session', '保存训练');
@@ -178,25 +184,38 @@ class AppLocalizations {
   // ── Connect senior ──────────────────────────────────────────────────────────
   String get connectToSenior => _t('Connect to a Senior', '关联长者');
   String get connectSeniorSubtitle => _t(
-      "Enter the Play code for the person you'd like to monitor.",
-      '输入您想关注的长者的 Play 代码。');
+    "Enter the Play code for the person you'd like to monitor.",
+    '输入您想关注的长者的 Play 代码。',
+  );
   String get connectCodeHint => _t('e.g. WORD-1234', '例如 WORD-1234');
   String get connect => _t('Connect', '关联');
   String get notSignedIn => _t('Not signed in', '尚未登录');
   String get codeNotFound => _t(
-      "That code wasn't found. Please check with the primary caregiver.",
-      '未找到该代码，请与主护理人确认。');
+    "That code wasn't found. Please check with the primary caregiver.",
+    '未找到该代码，请与主护理人确认。',
+  );
   String get alreadyMonitoring =>
       _t("You're already monitoring this person.", '您已经在关注此人。');
+  // Connect an existing senior by scanning their already-tagged NFC card.
+  String get orConnectWord => _t('or', '或');
+  String get scanTheirCard => _t('Scan their card', '扫描他们的卡片');
+  String get holdCardToPhone => _t('Hold the card to your phone…', '将卡片贴近手机…');
+  String get cardNotLinked => _t(
+    "That card isn't linked to anyone yet. Ask the primary caregiver to tag it first.",
+    '该卡片尚未关联任何人。请主护理人先进行标记。',
+  );
+  String get nfcNotAvailable =>
+      _t('NFC is not available on this phone.', '此手机不支持 NFC。');
 
   // ── Senior added ────────────────────────────────────────────────────────────
-  String seniorAddedToCircle(String name) => _t(
-      '$name has been added\nto your Care Circle.', '$name 已加入\n您的关护圈。');
+  String seniorAddedToCircle(String name) =>
+      _t('$name has been added\nto your Care Circle.', '$name 已加入\n您的关护圈。');
   String get theirPlayCode => _t('Their Play Code is:', '他们的 Play 代码是：');
   String get codeCopied => _t('Code copied to clipboard', '代码已复制到剪贴板');
   String shareCodeWith(String name) => _t(
-      'Share this with $name to\nlog into IncreMat Play.',
-      '将此代码分享给 $name，\n以登录 IncreMat Play。');
+    'Share this with $name to\nlog into IncreMat Play.',
+    '将此代码分享给 $name，\n以登录 IncreMat Play。',
+  );
   String get enrolNfcCard => _t('Enrol NFC Card', '登记 NFC 卡片');
 
   // ── NFC enrol sheet ─────────────────────────────────────────────────────────
@@ -206,25 +225,30 @@ class AppLocalizations {
   String get nfcEnrolFailed => _t('Enrolment Failed', '登记失败');
   String get nfcNotAvailableTitle => _t('NFC Not Available', 'NFC 不可用');
   String get nfcWaitingSubtitle => _t(
-      'Hold any NFC card — EZ-Link, access fob, etc. — to the back of the phone.',
-      '将任意 NFC 卡片（EZ-Link、门禁卡等）贴近手机背面。');
+    'Hold any NFC card — EZ-Link, access fob, etc. — to the back of the phone.',
+    '将任意 NFC 卡片（EZ-Link、门禁卡等）贴近手机背面。',
+  );
   String nfcScanningSubtitle(String name) => _t(
-      "Hold $name's card flat against the back of the phone.",
-      '将 $name 的卡片平贴在手机背面。');
+    "Hold $name's card flat against the back of the phone.",
+    '将 $name 的卡片平贴在手机背面。',
+  );
   String nfcSuccessSubtitle(String name, String uid) => _t(
-      "$name's card has been enrolled. They can now tap it on the mat to log in automatically.\n\nUID: $uid",
-      '$name 的卡片已登记。现在可在坐垫上轻触即可自动登录。\n\nUID: $uid');
+    "$name's card has been enrolled. They can now tap it on the mat to log in automatically.\n\nUID: $uid",
+    '$name 的卡片已登记。现在可在坐垫上轻触即可自动登录。\n\nUID: $uid',
+  );
   String get nfcUnavailableSubtitle => _t(
-      'This device does not have NFC or it is turned off. Enable NFC in Settings and try again.',
-      '此设备没有 NFC 或已关闭。请在设置中启用 NFC 后重试。');
+    'This device does not have NFC or it is turned off. Enable NFC in Settings and try again.',
+    '此设备没有 NFC 或已关闭。请在设置中启用 NFC 后重试。',
+  );
   String get nfcSaveFailed =>
       _t('Failed to save card. Please try again.', '保存卡片失败，请重试。');
 
   // ── Session music ───────────────────────────────────────────────────────────
   String get sessionMusic => _t('Session Music', '训练音乐');
   String musicNowLoaded(String song) => _t(
-      "Now loaded: $song — layers up live as your loved one exercises, driven by the mat's rep count.",
-      '当前加载：$song — 随着亲人锻炼，根据坐垫的次数实时叠加音乐层。');
+    "Now loaded: $song — layers up live as your loved one exercises, driven by the mat's rep count.",
+    '当前加载：$song — 随着亲人锻炼，根据坐垫的次数实时叠加音乐层。',
+  );
   String get musicSessionCompleteLabel => _t('Session Complete', '训练完成');
   String get musicWaitingFirstRep => _t('Waiting for First Rep', '等待第一次');
   String get musicNowPlaying => _t('Now Playing', '正在播放');
@@ -235,16 +259,19 @@ class AppLocalizations {
   String musicLayerTitle(int layer, String name) =>
       _t('Layer $layer · $name', '第 $layer 层 · $name');
   String get musicStemsMissing => _t(
-      'Stem files not found — add them under assets/audio/stems/',
-      '未找到音轨文件 — 请添加至 assets/audio/stems/');
+    'Stem files not found — add them under assets/audio/stems/',
+    '未找到音轨文件 — 请添加至 assets/audio/stems/',
+  );
   String musicSessionEnded(int reps) =>
       _t('Session ended · $reps reps', '训练结束 · $reps 次');
   String get musicBeginsAutomatically => _t(
-      'Music begins automatically on the first rep detected',
-      '检测到第一次时音乐将自动开始');
+    'Music begins automatically on the first rep detected',
+    '检测到第一次时音乐将自动开始',
+  );
   String musicStemsPlaying(int layer, int total, int reps) => _t(
-      '$layer of $total stems playing · $reps reps',
-      '$total 个音轨中播放 $layer 个 · $reps 次');
+    '$layer of $total stems playing · $reps reps',
+    '$total 个音轨中播放 $layer 个 · $reps 次',
+  );
   String get musicReps => _t('Reps', '次数');
   String get musicLayers => _t('Layers', '层');
   String get musicNextLayer => _t('Next Layer', '下一层');
@@ -253,6 +280,10 @@ class AppLocalizations {
   String get musicDash => '—';
   String get musicEndSession => _t('End session', '结束训练');
   String get musicRestart => _t('Restart from chunk 1', '从头重新开始');
+  String get musicBoostOn => _t(
+    'Boost on — louder than the phone\'s usual maximum',
+    '增强已开启 — 比手机常规最大音量更响',
+  );
   String get musicSessionLayers => _t('Session Layers', '训练音乐层');
   String musicLayersCount(int n) => _t('$n layers', '$n 层');
   String musicLayerActive(int n) => _t('Layer $n active', '第 $n 层进行中');
@@ -261,6 +292,26 @@ class AppLocalizations {
   String layerName(int i) => isZh
       ? const ['鼓点', '贝斯', '吉他', '旋律', '人声'][i]
       : const ['Drums', 'Bass', 'Guitar', 'Melody', 'Vocals'][i];
+  // Per-STEM label, so a song's layers are named by what they actually are
+  // (not every song has drums/bass/guitar — e.g. a piano-led ballad).
+  String layerNameForStem(String stem) {
+    switch (stem) {
+      case 'drums.mp3':
+        return _t('Drums', '鼓点');
+      case 'bass.mp3':
+        return _t('Bass', '贝斯');
+      case 'guitar.mp3':
+        return _t('Guitar', '吉他');
+      case 'piano.mp3':
+        return _t('Piano', '钢琴');
+      case 'other.mp3':
+        return _t('Melody', '旋律');
+      case 'vocals.mp3':
+        return _t('Vocals', '人声');
+      default:
+        return _t('Layer', '音层');
+    }
+  }
   String layerHint(int i) => isZh
       ? const ['节奏基础', '贝斯律动加入', '吉他加入', '键盘与配器丰富', '人声 · 完整歌曲'][i]
       : const [
@@ -268,8 +319,76 @@ class AppLocalizations {
           'Bass groove joins',
           'Guitar joins in',
           'Keys & extras fill out',
-          'Vocals — full song'
+          'Vocals — full song',
         ][i];
+  // Per-STEM hint, matching [layerNameForStem].
+  String layerHintForStem(String stem) {
+    switch (stem) {
+      case 'drums.mp3':
+        return _t('Rhythmic foundation', '节奏基础');
+      case 'bass.mp3':
+        return _t('Bass groove joins', '贝斯律动加入');
+      case 'guitar.mp3':
+        return _t('Guitar joins in', '吉他加入');
+      case 'piano.mp3':
+        return _t('Piano joins in', '钢琴加入');
+      case 'other.mp3':
+        return _t('Keys & extras fill out', '键盘与配器丰富');
+      case 'vocals.mp3':
+        return _t('Vocals — full song', '人声 · 完整歌曲');
+      default:
+        return _t('A new layer joins', '新的音层加入');
+    }
+  }
+
+  // ── Developer / Simulator ───────────────────────────────────────────────────
+  String get devSimulator => _t('Developer · Simulator', '开发者 · 模拟器');
+  String get devSimulatorMode => _t('Simulator mode', '模拟器模式');
+  String get devSimulatorModeHint => _t(
+    'Use a fake mat instead of Bluetooth. Reps below drive the whole app.',
+    '使用虚拟坐垫代替蓝牙。下方注入的次数会驱动整个应用。',
+  );
+  String get devSimulatorTurnOnHint => _t(
+    'Turn on simulator mode to inject reps and test without the mat.',
+    '开启模拟器模式即可注入次数，无需坐垫进行测试。',
+  );
+  String get devStartingSimulator => _t('Starting simulator…', '正在启动模拟器…');
+  String get devReps => _t('Reps', '次数');
+  String get devRepsCumulative =>
+      _t('cumulative reps sent to the app', '发送给应用的累计次数');
+  String get devReset => _t('Reset', '重置');
+  String get devAutoReps => _t('Auto reps', '自动计数');
+  String devAutoRepsEvery(String seconds) =>
+      _t('1 rep every ${seconds}s', '每 $seconds 秒 1 次');
+  String get devConnection => _t('Connection', '连接');
+  String get devConnected => _t('Connected', '已连接');
+  String get devMatOnChair => _t('Mat on chair', '坐垫已放置');
+  String get devBattery => _t('Battery', '电量');
+  String get devAvgRepTime => _t('Average rep time', '平均每次用时');
+  String get devAvgRepTimeHint => _t(
+    'Emit an average rep time (feeds session speed stats).',
+    '发送一个平均每次用时（用于训练速度统计）。',
+  );
+  String devSpeedFast(String seconds) =>
+      _t('Fast · ${seconds}s', '快 · $seconds 秒');
+  String devSpeedNormal(String seconds) =>
+      _t('Normal · ${seconds}s', '正常 · $seconds 秒');
+  String devSpeedSlow(String seconds) =>
+      _t('Slow · ${seconds}s', '慢 · $seconds 秒');
+  String get devNfcTapOnMat => _t('NFC tap on mat', '坐垫 NFC 触碰');
+  String get devNfcHint => _t(
+    'Emit a card UID as if tapped on the mat reader (must match an enrolled card to resolve a senior).',
+    '模拟在坐垫读卡器上触碰卡片的 UID（须与已登记的卡片匹配才能识别长者）。',
+  );
+  String get devCardUidHint => _t('card UID (hex)', '卡片 UID（十六进制）');
+  String get devEmit => _t('Emit', '发送');
+
+  String get devMobilityAlert => _t('Mobility alert', '活动预警');
+  String get devMobilityAlertHint => _t(
+    'Fire a sample sit-to-stand decline notification to preview how the caregiver warning looks.',
+    '发送一条示例的起坐能力下降通知，以预览看护者预警的样子。',
+  );
+  String get devSendSampleAlert => _t('Send sample alert', '发送示例预警');
 
   // ── Reports / PDF export ────────────────────────────────────────────────────
   String get exportMobilityReport => _t('Export Mobility Report', '导出活动报告');
@@ -277,39 +396,44 @@ class AppLocalizations {
       _t('Preview your mobility report', '预览您的活动报告');
   String get mobilityExerciseReport =>
       _t('Mobility & Exercise Report', '活动与锻炼报告');
-  String reportMeta(String name, String range) =>
-      _t('IncreMat Data  •  $name  •  $range', 'IncreMat 数据  •  $name  •  $range');
-  String get totalRepsThisMonth => _t('Total Reps this Month', '本月总次数');
-  String get totalRepetitions => _t('Total Repetitions', '总重复次数');
+  String reportMeta(String name, String range) => _t(
+    'IncreMat Data  •  $name  •  $range',
+    'IncreMat 数据  •  $name  •  $range',
+  );
+  String get totalRepsThisMonth => _t('Total Repetitions', '总次数');
+  String get totalRepetitions => _t('In the selected period', '所选时间段内');
   String get dailyConsistency => _t('Daily Consistency', '每日坚持度');
   String get daysWithIncreMat => _t('Days with IncreMat', '使用 IncreMat 的天数');
-  String pdfDaysWithIncreMat(int a, int b) => _t(
-      'Days with IncreMat  •  $a/$b days', '使用 IncreMat 的天数  •  $b 天中 $a 天');
+  String pdfDaysWithIncreMat(int a, int b) =>
+      _t('Days with IncreMat  •  $a/$b days', '使用 IncreMat 的天数  •  $b 天中 $a 天');
   String get sitToStandSpeed => _t('Sit-to-Stand Speed', '起坐速度');
-  String get avgRepTimeThisMonth =>
-      _t('Average rep time this month', '本月平均每次时长');
-  String get weeklyRepetitions => _t('Weekly Repetitions', '每周重复次数');
+  String get avgRepTimeThisMonth => _t('Average time per rep', '平均每次时长');
+  String get weeklyRepetitions => _t('This week\'s repetitions', '本周重复次数');
   String get daysWord => _t('days', '天');
   String dayN(int n) => _t('Day $n', '第 $n 天');
   String get selectDateRange => _t('Select Date Range', '选择日期范围');
   String get shareWithDoctor => _t('Share with Doctor', '与医生分享');
-  String generatedBy(String date) =>
-      _t('Generated by IncreMat Caregiver  •  $date',
-          '由 IncreMat 护理端生成  •  $date');
+  String get reportExportFailed =>
+      _t('Could not create the report. Please try again.', '无法生成报告，请重试。');
+  String generatedBy(String date) => _t(
+    'Generated by IncreMat Caregiver  •  $date',
+    '由 IncreMat 护理端生成  •  $date',
+  );
 
   // ── Insights ────────────────────────────────────────────────────────────────
   String get repStatistics => _t('Rep Statistics', '次数统计');
   String get noDataYet => _t('No data yet', '暂无数据');
   String get insightsEmptySubtitle => _t(
-      'Add a loved one on the Home tab to start\ntracking their sit-to-stand progress.',
-      '在主页添加一位亲人，\n开始记录他们的起坐进度。');
+    'Add a loved one on the Home tab to start\ntracking their sit-to-stand progress.',
+    '在主页添加一位亲人，\n开始记录他们的起坐进度。',
+  );
   String get performanceTrends => _t('Performance Trends', '表现趋势');
   String get dailyRepActivity =>
       _t('Daily rep activity for the current week', '本周每日次数活动');
   String get dailyRepsLegend => _t('Daily Reps', '每日次数');
   String get weeklyConsistency => _t('Weekly Consistency', '每周坚持度');
-  String get consistentProgress => _t(
-      'Consistent progress. Keep up the great work!', '保持稳定进步，继续加油！');
+  String get consistentProgress =>
+      _t('Consistent progress. Keep up the great work!', '保持稳定进步，继续加油！');
   String get speed => _t('Speed', '速度');
   String get averageRepTime => _t('Average Rep Time', '平均每次时长');
   String get secUnit => _t('sec', '秒');
@@ -318,8 +442,9 @@ class AppLocalizations {
   String daysActiveMonth(int a, int b) =>
       _t('$a/$b days active', '$b 天中 $a 天活跃');
   String get insightsCta => _t(
-      'Small, consistent efforts\nlead to meaningful progress.',
-      '小而持续的努力，\n带来有意义的进步。');
+    'Small, consistent efforts\nlead to meaningful progress.',
+    '小而持续的努力，\n带来有意义的进步。',
+  );
 
   // ── Senior detail ───────────────────────────────────────────────────────────
   String get monthlySummary => _t('Monthly Summary', '月度总结');
@@ -337,8 +462,8 @@ class AppLocalizations {
   String get consistency => _t('Consistency', '坚持度');
   String get avgSpeed => _t('Avg Speed', '平均速度');
   String get noSessionsRecorded => _t('No sessions recorded yet', '尚无训练记录');
-  String get sessionsWillAppear => _t(
-      'Sessions will appear here once the mat syncs.', '坐垫同步后，训练将显示在这里。');
+  String get sessionsWillAppear =>
+      _t('Sessions will appear here once the mat syncs.', '坐垫同步后，训练将显示在这里。');
   String playCodeOf(String name) =>
       _t("$name's Play Code: ", '$name 的 Play 代码：');
   String repsSyncing(int reps) =>
@@ -351,17 +476,25 @@ class AppLocalizations {
   // ── Hardware screen ─────────────────────────────────────────────────────────
   String get hardwareTitle => _t('Hardware Status', '硬件状态');
   String get hardwareSubtitle => _t(
-      'View the connection and performance\nof your IncreMat sensor.',
-      '查看您的 IncreMat 传感器的\n连接与性能。');
+    'View the connection and performance\nof your IncreMat sensor.',
+    '查看您的 IncreMat 传感器的\n连接与性能。',
+  );
   String get statusLabel => _t('Status: ', '状态：');
   String get connected => _t('Connected', '已连接');
   String get disconnected => _t('Disconnected', '已断开');
   String get matOnChair => _t('Mat on chair', '坐垫已就位');
   String get matRemoved => _t('Mat removed', '坐垫已移除');
   String get liveSessionLabel => _t('Live session: ', '实时训练：');
-  String avgSeconds(String s) => _t('$s' 's avg', '平均 $s 秒');
+  String avgSeconds(String s) => _t(
+    '$s'
+        's avg',
+    '平均 $s 秒',
+  );
   String batteryLabel(int pct) => _t('Battery: $pct%', '电量：$pct%');
   String signalLabelText(String level) => _t('Signal: $level', '信号：$level');
+  // Shown when nothing is connected — there's no real reading to display.
+  String get batteryUnknown => _t('Battery: —', '电量：—');
+  String get signalUnknown => _t('Signal: —', '信号：—');
   String get signalStrong => _t('Strong', '强');
   String get signalGood => _t('Good', '良好');
   String get signalWeak => _t('Weak', '弱');
@@ -377,8 +510,9 @@ class AppLocalizations {
   String nowTracking(String name) => _t('Now tracking: $name', '正在记录：$name');
   String get identifyUser => _t('Identify User', '识别用户');
   String get identifyUserSubtitle => _t(
-      "Tap a senior's NFC tag to assign this session.",
-      '轻触长者的 NFC 标签以归属此次训练。');
+    "Tap a senior's NFC tag to assign this session.",
+    '轻触长者的 NFC 标签以归属此次训练。',
+  );
   String get holdTagToPhone => _t('Hold tag to phone…', '将标签靠近手机…');
   String get scanNfcTag => _t('Scan NFC Tag', '扫描 NFC 标签');
 
@@ -394,10 +528,12 @@ class AppLocalizations {
   String get couldNotSaveGoal =>
       _t('Could not save goal. Please try again.', '无法保存目标，请重试。');
   String get weeklyRewardDays => _t('Weekly Reward Days', '每周奖励天数');
-  String get couldNotSave => _t('Could not save. Please try again.', '无法保存，请重试。');
+  String get couldNotSave =>
+      _t('Could not save. Please try again.', '无法保存，请重试。');
   String eggRewardExplain(String name, int threshold) => _t(
-      '$name earns an egg in IncreMat Play when the daily goal of $threshold ${threshold == 1 ? 'day' : 'days'} a week is met.',
-      '当每周有 $threshold 天达成每日目标时，$name 将在 IncreMat Play 中获得一枚蛋。');
+    '$name earns an egg in IncreMat Play when the daily goal of $threshold ${threshold == 1 ? 'day' : 'days'} a week is met.',
+    '当每周有 $threshold 天达成每日目标时，$name 将在 IncreMat Play 中获得一枚蛋。',
+  );
   String get selectTrack => _t('Select Track', '选择曲目');
   String get orDivider => _t('OR', '或');
   String get randomizeTracks => _t('Randomize Tracks', '随机播放曲目');
@@ -421,8 +557,202 @@ class AppLocalizations {
   String get deleteAccount => _t('Delete Account', '删除账户');
   String get deleteAccountQ => _t('Delete Account?', '删除账户？');
   String get deleteAccountWarning => _t(
-      'This permanently removes your account and all care data. Enter your password to confirm.',
-      '这将永久删除您的账户和所有护理数据。请输入密码确认。');
+    'This permanently removes your account and all care data. Enter your password to confirm.',
+    '这将永久删除您的账户和所有护理数据。请输入密码确认。',
+  );
+
+  // ── User guide ───────────────────────────────────────────────────────────────
+  String get userGuide => _t('User Guide', '使用指南');
+  String get userGuideSubtitle =>
+      _t('How to set up and use IncreMat', '如何设置和使用 IncreMat');
+  String get guideHeader => _t('Getting Started', '快速上手');
+  String get guideIntro => _t(
+    'IncreMat helps you support a loved one\'s daily exercise. Here\'s how each part works.',
+    'IncreMat 帮助您支持家人的每日锻炼。以下是各部分的使用方法。',
+  );
+
+  String get guideAddTitle => _t('1. Add your loved one', '1. 添加您的家人');
+  String get guideAddBody => _t(
+    'On the Home tab, tap "Add loved one" and enter their name and daily goal. Each person gets their own profile, progress, and pet.',
+    '在"主页"标签中，点按"添加家人"并输入姓名和每日目标。每个人都有自己的档案、进度和宠物。',
+  );
+
+  String get guidePlayCodeTitle =>
+      _t('2. Share the play code — privately', '2. 私下分享 Play 代码');
+  String get guidePlayCodeBody => _t(
+    'Each loved one has a play code used to sign in to the IncreMat Play app on their phone. Treat it like a password: it is a login credential. Share it directly with that person only — never post it where others can see it.',
+    '每位家人都有一个 Play 代码，用于在他们手机上的 IncreMat Play 应用登录。请像对待密码一样对待它：这是登录凭证。仅直接分享给本人，切勿公开张贴。',
+  );
+
+  String get guideMatTitle => _t('3. Connect the mat', '3. 连接锻炼垫');
+  String get guideMatBody => _t(
+    'Open the Hardware tab and tap Connect to pair the mat over Bluetooth. Stay nearby while connecting. Once linked, reps from the mat appear live and are saved automatically.',
+    '打开"设备"标签并点按"连接"，通过蓝牙配对锻炼垫。连接时请保持靠近。连接后，垫子的次数会实时显示并自动保存。',
+  );
+
+  String get guideNfcTitle => _t('4. Set up NFC cards', '4. 设置 NFC 卡');
+  String get guideNfcBody => _t(
+    'You can link a tap card to a loved one so they sign in by tapping it. Use "Write card" on a profile, or tap a card on the mat\'s reader to identify who is exercising.',
+    '您可以为家人关联一张感应卡，他们只需轻触即可登录。在档案中使用"写入卡片"，或在垫子的读卡器上轻触卡片以识别正在锻炼的人。',
+  );
+
+  String get guideGoalsTitle =>
+      _t('5. Goals, rewards & reminders', '5. 目标、奖励与提醒');
+  String get guideGoalsBody => _t(
+    'In Settings, set the daily rep goal, choose how many days a week earns a reward egg, pick session music, and turn on a daily reminder if the goal isn\'t met.',
+    '在"设置"中，设定每日次数目标，选择每周达成几天可获得奖励蛋，挑选锻炼音乐，并可在未达标时开启每日提醒。',
+  );
+
+  String get guideTogetherTitle => _t('6. Exercise together', '6. 一起锻炼');
+  String get guideTogetherBody => _t(
+    'In the Play app, two people can work out at once — either teaming up so their reps add together, or competing in a friendly race. They pair with a short match code, not their play code.',
+    '在 Play 应用中，两人可以同时锻炼 — 可以组队让次数相加，也可以进行友好比拼。他们使用一个简短的比赛代码配对，而不是 Play 代码。',
+  );
+
+  String get guideReportsTitle => _t('7. Track progress', '7. 追踪进度');
+  String get guideReportsBody => _t(
+    'The Insights tab shows trends over time, and the Reports tab lets you export a summary to share with a doctor or family.',
+    '"洞察"标签显示长期趋势，"报告"标签可让您导出摘要，与医生或家人分享。',
+  );
+
+  String get guideHelpTitle => _t('Need more help?', '需要更多帮助？');
+  String get guideHelpBody => _t(
+    'If the mat won\'t connect, make sure Bluetooth is on and the mat is powered, then reopen the Hardware tab. Your data syncs automatically when you\'re back online.',
+    '如果锻炼垫无法连接，请确保蓝牙已开启且垫子已通电，然后重新打开"设备"标签。重新联网后，您的数据会自动同步。',
+  );
+
+  // ── Everyday sit-to-stand pace (personal trend, NOT a clinical test) ──────────
+  String get fiveRepTitle => _t('Sit-to-Stand Pace', '坐立节奏');
+  String get fiveRepSubtitle => _t('Everyday 5-rep time', '日常五次用时');
+  String get fiveRepStatTitle => _t('Sit-to-Stand Pace', '坐立节奏');
+  String get fiveRepStatSubtitle => _t('Everyday 5-rep time', '日常五次用时');
+  String get fiveRepLabel => _t('5-rep pace', '五次节奏');
+  String get doFiveReps => _t('No reps recorded yet', '尚无记录');
+  String get fiveRepExplain => _t(
+    'Their usual time to do 5 sit-to-stands during everyday sessions. Lower is faster. This is a day-to-day trend, not a clinical test.',
+    '他们在日常锻炼中完成五次起坐的常见用时。越短越快。这是日常趋势，并非临床测试。',
+  );
+
+  // Mobility decline alert (shown to the caregiver)
+  String get mobilityAlertHeading => _t('Mobility check-in', '行动力提醒');
+  String mobilityDayDrop(String name, int pct) => _t(
+    "$name's sit-to-stand was $pct% slower than usual today. It may be worth checking in on them.",
+    '$name 今天的坐立速度比平时慢了 $pct%，建议关心一下。',
+  );
+  String mobilityWeekDrop(String name, int pct) => _t(
+    "$name's sit-to-stand has slowed $pct% this week. It may be worth checking in on them.",
+    '$name 本周的坐立速度下降了 $pct%，建议关心一下。',
+  );
+
+  // Manual session entry
+  String get firstFiveTimeOptional =>
+      _t('Time for first 5 reps (sec, optional)', '前五次用时（秒，可选）');
+  String get enterValidTimeOptional =>
+      _t('Enter a valid time, or leave blank', '请输入有效时间，或留空');
+
+  // Report (PDF) — everyday pace row (clearly NOT the clinical test)
+  String get fiveRepReportLabel => _t('Everyday Sit-to-Stand Pace', '日常坐立节奏');
+  String get fiveRepReportSub => _t(
+    'Typical time for 5 reps in sessions (not a clinical test)',
+    '锻炼中完成五次的常见用时（非临床测试）',
+  );
+  String get notMeasured => _t('Not recorded', '无记录');
+
+  // ── 30-Second Chair Stand Test (30CST) ───────────────────────────────────────
+  String get chairStandTitle => _t('30-Second Chair Stand', '30 秒坐立测试');
+  String get chairStandIntroTitle => _t('Fitness check', '体能检测');
+  String get chairStandIntroSubtitle => _t(
+    'Count how many times they can stand up and sit down in 30 seconds. It gives a general guide to leg strength.',
+    '记录他们在 30 秒内能起立并坐下多少次。用于大致评估腿部力量。',
+  );
+  String get chairStandStep1 => _t(
+    'Use a standard, stable chair (about knee height, no armrests, against a wall). Sit in the middle, feet flat, arms crossed over the chest.',
+    '使用标准稳固的椅子（约膝盖高度、无扶手、靠墙）。坐在中间，双脚踏平，双臂交叉抱胸。',
+  );
+  String get chairStandStep2 => _t(
+    'On "start", stand up fully then sit back down, as many times as possible.',
+    '听到"开始"后，完全站起再坐下，尽可能多做几次。',
+  );
+  String get chairStandStep3 =>
+      _t('Tap the button each time they fully stand up.', '他们每完全站起一次，就点按一下按钮。');
+  String get chairStandStep4 => _t(
+    'Keep going for the full 30 seconds — it stops automatically.',
+    '坚持完整的 30 秒 — 时间到会自动停止。',
+  );
+  String get chairStandSafety => _t(
+    'Stop if they feel pain or dizzy. Stay close in case they need support.',
+    '如出现疼痛或头晕请立即停止。请在旁守护以便随时搀扶。',
+  );
+  String get chairStandDisclaimer => _t(
+    'This is a general screening guide, not a medical diagnosis. The result can vary with chair height and setup. Share any concerns with a doctor.',
+    '这是一般性筛查参考，并非医疗诊断。结果可能因椅子高度和设置而异。如有疑虑请咨询医生。',
+  );
+  String get recommendedGoalNote => _t(
+    'A starting suggestion — adjust anytime in Settings.',
+    '起始建议 — 可随时在设置中调整。',
+  );
+  String goalAboveCapacity(int recommended) => _t(
+    'This is well above the goal suggested by their last fitness test (about $recommended). Consider easing in to avoid overexertion.',
+    '这远高于上次体能测试建议的目标（约 $recommended）。建议循序渐进，避免过度运动。',
+  );
+  String get startTest => _t('Start test', '开始测试');
+  String get secondsLeftUnit => _t('sec left', '秒剩余');
+  String get standsCounted => _t('stands', '次');
+  String get tapEachStand => _t('Tap each time they stand', '每次站起点按一下');
+  String get countFromMat => _t('Count from the mat', '由垫子计数');
+  String get countFromMatOn =>
+      _t('The mat counts each stand automatically', '垫子自动记录每次起立');
+  String get countManually => _t('You\'ll tap to count', '由您点按计数');
+  String get matNotConnectedCount =>
+      _t('Mat not connected — tap to count', '垫子未连接 — 点按计数');
+  String get matIsCounting => _t('Mat is counting…', '垫子正在计数…');
+  String get testComplete => _t('Test complete', '测试完成');
+  String get standsInThirtySeconds => _t('stands in 30 seconds', '30 秒内起立次数');
+  String get belowAverage => _t('Below average', '低于平均');
+  String get average => _t('Average', '平均水平');
+  String get aboveAverage => _t('Above average', '高于平均');
+  String get chairStandBelowDesc => _t(
+    'This is below the typical range for their age, which can be linked to a higher fall risk. Regular daily exercise can help build leg strength.',
+    '这低于同龄常见范围，可能与较高的跌倒风险相关。坚持每日锻炼有助于增强腿部力量。',
+  );
+  String get chairStandAverageDesc => _t(
+    'This is within the typical range for their age. Keep up regular exercise to maintain it.',
+    '这处于同龄常见范围内。坚持规律锻炼以保持状态。',
+  );
+  String get chairStandAboveDesc => _t(
+    'This is above the typical range for their age — a good sign. Great work!',
+    '这高于同龄常见范围 — 是个好迹象。表现很棒！',
+  );
+  String get recommendedDailyGoal => _t('Recommended daily goal', '建议每日目标');
+  String repsPerDayValue(int n) => _t('$n reps per day', '每天 $n 次');
+  String setDailyGoalTo(int n) =>
+      _t('Set daily goal to $n reps', '将每日目标设为 $n 次');
+  String get saveResult => _t('Save result', '保存结果');
+  String get redoTest => _t('Redo test', '重新测试');
+  String get testSaved => _t('Fitness test saved', '体能测试已保存');
+  String get couldNotSaveTest =>
+      _t('Could not save the test. Please try again.', '无法保存测试，请重试。');
+
+  // Chair-stand card / prompts on the senior screen
+  String get chairStandCardTitle => _t('Chair Stand Test', '坐立测试');
+  String get chairStandNeverTested => _t('Not tested yet', '尚未测试');
+  String chairStandLastTested(String when) =>
+      _t('Last tested $when', '上次测试：$when');
+  String get chairStandDoTest => _t('Do the test', '进行测试');
+  String get chairStandRetest => _t('Retest', '重新测试');
+  String chairStandBaselinePrompt(String name) => _t(
+    'Do a quick 30-second fitness test with $name to set the right starting goal.',
+    '与 $name 做一次 30 秒体能测试，以设定合适的起始目标。',
+  );
+  String chairStandDuePrompt(String name) =>
+      _t("It's time for $name's monthly fitness check.", '该为 $name 进行每月体能检测了。');
+  String chairStandStandsValue(int n) => _t('$n stands', '$n 次');
+  String get chairStandTrend => _t('Trend over time (stands)', '历次趋势（次数）');
+
+  // Report (PDF) — 30CST row
+  String get chairStandReportLabel => _t('30-Sec Chair Stand Test', '30 秒坐立测试');
+  String get chairStandReportSub =>
+      _t('Stands in 30s — leg strength & fall risk', '30 秒起立次数 — 腿力与跌倒风险');
 }
 
 class _AppLocalizationsDelegate
@@ -430,8 +760,7 @@ class _AppLocalizationsDelegate
   const _AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) =>
-      ['en', 'zh'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => ['en', 'zh'].contains(locale.languageCode);
 
   @override
   Future<AppLocalizations> load(Locale locale) async =>
