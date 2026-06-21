@@ -13,7 +13,7 @@ import 'senior_provider.dart';
 
 /// Gapless layered-music engine using isolated instrument stems.
 ///
-/// All [kLayerCount] stems are the *same* long track split per instrument.
+/// All [kMaxLayers] stems are the *same* long track split per instrument.
 /// They play **simultaneously, in sync, from the first rep** — layers 2…N
 /// start silent (volume 0). "Adding a layer" simply fades that stem's volume
 /// up, so it enters perfectly in time with zero loading/seeking latency.
@@ -23,11 +23,17 @@ import 'senior_provider.dart';
 ///
 /// Rules:
 ///   * Nothing is audible until rep #1 is detected.
-///   * Every `repsPerLayer` reps the next stem fades in (capped at
-///     [kLayerCount]). `repsPerLayer` scales with the senior's daily goal so
-///     the full mix lands as the goal is met (see [repsPerLayerForGoal]).
+///   * Every `repsPerLayer` reps the next stem fades in (capped at the active
+///     song's layer count). `repsPerLayer` scales with the senior's daily goal
+///     so the full mix lands as the goal is met (see [repsPerLayerForGoal]).
 ///   * The track loops continuously; the session ends only on manual stop.
-const int kLayerCount = 5;
+///
+/// [kMaxLayers] is the MAXIMUM number of layers any song can have — we allocate
+/// that many players/enhancers once. Each song then uses the first
+/// `song.layerCount` of them (see [SongOption.stems]); the rest stay muted.
+/// Raised to 6 so songs with a full 6-stem split (drums/bass/guitar/piano/
+/// other/vocals) can use them all.
+const int kMaxLayers = 6;
 
 /// Master volume range. 0–100% is normal device volume; 100–200% applies an
 /// extra gain boost (via AndroidLoudnessEnhancer) so the music can play louder
@@ -57,25 +63,68 @@ const List<String> kStemFiles = [
   'vocals.mp3', // layer 5 — full song
 ];
 
-String stemAssetPath(String folder, int layer) =>
-    'assets/audio/stems/$folder/${kStemFiles[layer]}';
+// Builds the asset path for a given [layer] using that song's own [stems] list,
+// so each song decides its own number/order of layers.
+String stemAssetPath(String folder, List<String> stems, int layer) =>
+    'assets/audio/stems/$folder/${stems[layer]}';
 
-/// A selectable song, mapped to its stem folder. [id] matches the track names
-/// shown in the Settings music card so the selection drives playback.
+/// A selectable song. [stems] lists its layer files in build-up order (layer 1
+/// → N); its length is the song's layer count. Defaults to the standard 5-stem
+/// set ([kStemFiles]); a song with fewer stems (e.g. a ballad with no drums)
+/// just supplies a shorter list and the engine plays it as a TRUE N-layer
+/// build-up — no duplicated/faked stems.
 class SongOption {
   final String id;
   final String name;
   final String folder;
+  final List<String> stems;
   const SongOption({
     required this.id,
     required this.name,
     required this.folder,
+    this.stems = kStemFiles,
   });
+
+  /// How many layers this song actually has.
+  int get layerCount => stems.length;
 }
 
 const List<SongOption> kSongs = [
   SongOption(id: '半斤八两', name: '半斤八两', folder: 'banjinbaliang'),
   SongOption(id: '甜蜜蜜', name: '甜蜜蜜', folder: 'tianmimi'),
+  SongOption(id: '小苹果', name: '小苹果', folder: 'xiaopingguo'),
+  // "Over the Rainbow" — a ballad with no percussion. A TRUE 4-layer song built
+  // up from its instrumental bed → bass → guitar → vocals (no drums stem).
+  SongOption(
+    id: 'Over the Rainbow',
+    name: 'Over the Rainbow',
+    folder: 'overtherainbow',
+    stems: ['other.mp3', 'bass.mp3', 'guitar.mp3', 'vocals.mp3'],
+  ),
+  // "I Want It That Way" — a 3-layer build-up (piano → drums → vocals). The
+  // OTHER stem download was incomplete (.crdownload), so it's left out for now;
+  // drop a complete other.mp3 in the folder and add it here to make it 4 layers.
+  SongOption(
+    id: 'I Want It That Way',
+    name: 'I Want It That Way',
+    folder: 'iwantitthatway',
+    stems: ['piano.mp3', 'drums.mp3', 'vocals.mp3'],
+  ),
+  // 中国话 (S.H.E) — a full 6-layer build-up using every stem:
+  // drums → bass → guitar → piano → other (keys) → vocals.
+  SongOption(
+    id: '中国话',
+    name: '中国话',
+    folder: 'zhongguohua',
+    stems: ['drums.mp3', 'bass.mp3', 'guitar.mp3', 'piano.mp3', 'other.mp3', 'vocals.mp3'],
+  ),
+  // 阿里山 (Teresa Teng) — a 4-layer build-up: drums → bass → other → vocals.
+  SongOption(
+    id: '阿里山',
+    name: '阿里山',
+    folder: 'alishan',
+    stems: ['drums.mp3', 'bass.mp3', 'other.mp3', 'vocals.mp3'],
+  ),
 ];
 
 SongOption songForFolder(String folder) =>
@@ -116,19 +165,22 @@ const int kDefaultRepsPerLayer = 5;
 
 /// Derives how many reps separate each layer from the daily rep goal.
 ///
-/// There are [kLayerCount] layers but only `kLayerCount - 1` transitions
+/// There are [kMaxLayers] layers but only `kMaxLayers - 1` transitions
 /// (layer 1 is audible from the first rep), so spacing them evenly across the
 /// goal means the final, fullest layer lands exactly as the goal is met.
 /// e.g. goal 20 → 5 reps/layer, goal 40 → 10 reps/layer, goal 12 → 3.
-int repsPerLayerForGoal(int dailyRepGoal) {
+int repsPerLayerForGoal(int dailyRepGoal, int layerCount) {
   if (dailyRepGoal <= 0) return kDefaultRepsPerLayer;
-  final transitions = kLayerCount - 1;
+  // A song with N layers has N-1 transitions (layer 1 is audible from rep 1).
+  // Guard against 0/1-layer songs so we never divide by zero.
+  final transitions = (layerCount - 1).clamp(1, layerCount);
   return (dailyRepGoal / transitions).round().clamp(1, dailyRepGoal);
 }
 
-/// Number of stems that should be audible for a cumulative rep count.
-int layerForReps(int reps, int repsPerLayer) =>
-    (1 + reps ~/ repsPerLayer).clamp(1, kLayerCount);
+/// Number of stems that should be audible for a cumulative rep count, capped at
+/// the active song's [layerCount].
+int layerForReps(int reps, int repsPerLayer, int layerCount) =>
+    (1 + reps ~/ repsPerLayer).clamp(1, layerCount);
 
 class SessionMusicState {
   /// True once rep #1 has been detected and playback has begun.
@@ -140,7 +192,7 @@ class SessionMusicState {
   /// Cumulative reps reported by the mat this session.
   final int reps;
 
-  /// Number of stems currently audible (1…[kLayerCount]).
+  /// Number of stems currently audible (1…[kMaxLayers]).
   final int layer;
 
   /// Whether audio is actively playing right now.
@@ -159,6 +211,14 @@ class SessionMusicState {
   /// Display name of the song currently loaded.
   final String songName;
 
+  /// The active song's total number of layers (varies per song — e.g. 5 for the
+  /// standard set, 4 for a drumless ballad, 3 for a partial set).
+  final int layerCount;
+
+  /// The active song's stem filenames in build-up order — used to label each
+  /// layer correctly per song (not every song has drums/bass/guitar).
+  final List<String> stems;
+
   /// Master volume, 0.0–[kMaxVolume]. Above 1.0 boosts past the phone's max.
   final double volume;
 
@@ -173,6 +233,8 @@ class SessionMusicState {
     required this.assetMissing,
     required this.repsPerLayer,
     required this.songName,
+    this.layerCount = kMaxLayers,
+    this.stems = kStemFiles,
     this.volume = 1.0,
   });
 
@@ -211,6 +273,8 @@ class SessionMusicState {
     bool? assetMissing,
     int? repsPerLayer,
     String? songName,
+    int? layerCount,
+    List<String>? stems,
     double? volume,
   }) => SessionMusicState(
     started: started ?? this.started,
@@ -223,6 +287,8 @@ class SessionMusicState {
     assetMissing: assetMissing ?? this.assetMissing,
     repsPerLayer: repsPerLayer ?? this.repsPerLayer,
     songName: songName ?? this.songName,
+    layerCount: layerCount ?? this.layerCount,
+    stems: stems ?? this.stems,
     volume: volume ?? this.volume,
   );
 }
@@ -238,7 +304,7 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
   /// Per-stem layer gain (0–1, the fade target). The actual player volume is
   /// this × the master volume scalar, so the master slider and the per-layer
   /// fades compose cleanly.
-  final List<double> _layerGain = List.filled(kLayerCount, 0.0);
+  final List<double> _layerGain = List.filled(kMaxLayers, 0.0);
 
   static const _volKey = 'session_music_volume';
   double _volume = 1.0;
@@ -281,20 +347,23 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
   StreamSubscription<PlayerState>? _playerStateSub;
 
   Timer? _syncTimer;
-  final List<Timer?> _fadeTimers = List.filled(kLayerCount, null);
+  final List<Timer?> _fadeTimers = List.filled(kMaxLayers, null);
 
   bool _ready = false;
   bool _looping = false;
   String _currentFolder = kSongs.first.folder;
+  // How many layers the CURRENTLY LOADED song uses (≤ kMaxLayers). All active
+  // playback loops iterate this, not kMaxLayers, so unused players stay idle.
+  int _activeLayerCount = kStemFiles.length;
 
   // Drift beyond this between a stem and the master triggers a re-align.
   static const _driftTolerance = Duration(milliseconds: 60);
 
   @override
   SessionMusicState build() {
-    _enhancers = List.generate(kLayerCount, (_) => AndroidLoudnessEnhancer());
+    _enhancers = List.generate(kMaxLayers, (_) => AndroidLoudnessEnhancer());
     _players = List.generate(
-      kLayerCount,
+      kMaxLayers,
       (i) => AudioPlayer(
         audioPipeline: AudioPipeline(androidAudioEffects: [_enhancers[i]]),
       ),
@@ -359,13 +428,14 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
 
     final goal = ref.read(selectedSeniorProvider)?.dailyRepGoal;
     _currentFolder = ref.read(activeSongFolderProvider);
-    _preloadStems(_currentFolder);
+    _preloadStems(_currentFolder); // sets _activeLayerCount synchronously
     _loadVolume();
     _initTts(ref.read(localeProvider));
+    final song = songForFolder(_currentFolder);
     return SessionMusicState.initial(
-      repsPerLayer: repsPerLayerForGoal(goal ?? 0),
-      songName: songForFolder(_currentFolder).name,
-    );
+      repsPerLayer: repsPerLayerForGoal(goal ?? 0, _activeLayerCount),
+      songName: song.name,
+    ).copyWith(layerCount: _activeLayerCount, stems: song.stems);
   }
 
   /// Restores the saved master volume and applies it.
@@ -375,7 +445,7 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     _volume = (prefs.getDouble(_volKey) ?? 1.0).clamp(0.0, kMaxVolume);
     state = state.copyWith(volume: _volume);
     _applyBoost();
-    for (var i = 0; i < kLayerCount; i++) {
+    for (var i = 0; i < kMaxLayers; i++) {
       _pushStemVolume(i);
     }
   }
@@ -386,7 +456,7 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     _volumeTouched = true;
     _volume = v.clamp(0.0, kMaxVolume);
     state = state.copyWith(volume: _volume);
-    for (var i = 0; i < kLayerCount; i++) {
+    for (var i = 0; i < kMaxLayers; i++) {
       _pushStemVolume(i);
     }
     _applyBoost();
@@ -437,7 +507,7 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     if (tts == null || _announcing) return; // don't overlap ducking
     _announcing = true;
     _duckFactor = _kDuckFactor;
-    for (var i = 0; i < kLayerCount; i++) {
+    for (var i = 0; i < kMaxLayers; i++) {
       _pushStemVolume(i);
     }
     try {
@@ -447,22 +517,36 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
       // ignore — restore volume regardless below
     }
     _duckFactor = 1.0;
-    for (var i = 0; i < kLayerCount; i++) {
+    for (var i = 0; i < kMaxLayers; i++) {
       _pushStemVolume(i);
     }
     _announcing = false;
   }
 
-  /// Loads every stem of [folder], sets it to loop, and mutes it. They sit
+  /// Loads this song's stems, sets each to loop, and mutes it. They sit
   /// pre-buffered so the first rep can start all of them with no load latency.
+  /// Only `song.layerCount` players are loaded; any spare players (for songs
+  /// with fewer layers than [kMaxLayers]) are stopped and muted so they never
+  /// play. Sets `_activeLayerCount` up front so the rest of the engine and the
+  /// UI know how many layers this song has.
   Future<void> _preloadStems(String folder) async {
     _ready = false;
+    final song = songForFolder(folder);
+    final stems = song.stems;
+    _activeLayerCount = stems.length; // sync — read immediately by callers
     try {
-      for (var i = 0; i < kLayerCount; i++) {
-        await _players[i].setAsset(stemAssetPath(folder, i));
-        // Loop is driven as a group from the master's completion (see
-        // _loopAll), so individual players must NOT auto-loop.
-        await _players[i].setLoopMode(LoopMode.off);
+      for (var i = 0; i < kMaxLayers; i++) {
+        if (i < stems.length) {
+          await _players[i].setAsset(stemAssetPath(folder, stems, i));
+          // Loop is driven as a group from the master's completion (see
+          // _loopAll), so individual players must NOT auto-loop.
+          await _players[i].setLoopMode(LoopMode.off);
+        } else {
+          // Spare player not used by this (shorter) song — keep it idle.
+          try {
+            await _players[i].stop();
+          } catch (_) {}
+        }
         _layerGain[i] = 0.0;
         await _players[i].setVolume(0);
       }
@@ -470,7 +554,9 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
       state = state.copyWith(
         assetMissing: false,
         duration: _master.duration ?? Duration.zero,
-        songName: songForFolder(folder).name,
+        songName: song.name,
+        layerCount: _activeLayerCount,
+        stems: stems,
       );
     } catch (_) {
       state = state.copyWith(assetMissing: true);
@@ -491,8 +577,14 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
       await p.stop();
     }
     await _preloadStems(folder);
+    // The new song may have a different number of layers → recompute the
+    // per-layer cadence and clamp the current layer into the new song's range.
+    final goal = ref.read(selectedSeniorProvider)?.dailyRepGoal ?? 0;
+    final rpl = repsPerLayerForGoal(goal, _activeLayerCount);
+    final layer = layerForReps(state.reps, rpl, _activeLayerCount);
+    state = state.copyWith(repsPerLayer: rpl, layer: layer);
     if (resume && _ready) {
-      await _startPlayback(state.layer);
+      await _startPlayback(layer);
     }
   }
 
@@ -502,7 +594,8 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     if (state.ended) return;
     // The mat reset its counter (new session) — start announcing from zero again.
     if (cumulativeReps < state.reps) _lastAnnounced = 0;
-    final targetLayer = layerForReps(cumulativeReps, state.repsPerLayer);
+    final targetLayer =
+        layerForReps(cumulativeReps, state.repsPerLayer, _activeLayerCount);
 
     if (!state.started) {
       if (cumulativeReps < 1) {
@@ -533,12 +626,13 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
   }
 
   void _onGoalChanged(int? goal) {
-    final newRepsPerLayer = repsPerLayerForGoal(goal ?? 0);
+    final newRepsPerLayer = repsPerLayerForGoal(goal ?? 0, _activeLayerCount);
     if (newRepsPerLayer == state.repsPerLayer) return;
     state = state.copyWith(repsPerLayer: newRepsPerLayer);
 
     if (!state.started || state.ended) return;
-    final targetLayer = layerForReps(state.reps, newRepsPerLayer);
+    final targetLayer =
+        layerForReps(state.reps, newRepsPerLayer, _activeLayerCount);
     if (targetLayer > state.layer) {
       for (var i = state.layer; i < targetLayer; i++) {
         _fadeTo(i, 1.0);
@@ -566,13 +660,14 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
       return;
     }
     try {
-      for (var i = 0; i < kLayerCount; i++) {
+      // Only this song's active layers; spare players stay idle/muted.
+      for (var i = 0; i < _activeLayerCount; i++) {
         await _players[i].seek(Duration.zero);
         _layerGain[i] = i < audibleLayers ? 1.0 : 0.0;
         _pushStemVolume(i);
       }
       // Start them as close together as possible.
-      await Future.wait(_players.map((p) => p.play()));
+      await Future.wait(_players.take(_activeLayerCount).map((p) => p.play()));
       // One alignment pass after start jitter settles, then keep correcting.
       Future.delayed(const Duration(milliseconds: 400), _syncStems);
       _syncTimer?.cancel();
@@ -590,7 +685,7 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
   Future<void> _syncStems() async {
     if (_looping || !_master.playing) return;
     final ref0 = _master.position;
-    for (var i = 1; i < kLayerCount; i++) {
+    for (var i = 1; i < _activeLayerCount; i++) {
       final diff = (_players[i].position - ref0).abs();
       if (diff > _driftTolerance) {
         await _players[i].seek(ref0);
@@ -605,10 +700,10 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
     if (_looping) return; // guard against duplicate completion events
     _looping = true;
     try {
-      for (final p in _players) {
-        await p.seek(Duration.zero);
+      for (var i = 0; i < _activeLayerCount; i++) {
+        await _players[i].seek(Duration.zero);
       }
-      await Future.wait(_players.map((p) => p.play()));
+      await Future.wait(_players.take(_activeLayerCount).map((p) => p.play()));
     } catch (_) {
       // ignore — next completion will retry
     } finally {
@@ -647,8 +742,8 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
         p.pause();
       }
     } else {
-      for (final p in _players) {
-        p.play();
+      for (var i = 0; i < _activeLayerCount; i++) {
+        _players[i].play();
       }
       _syncStems();
     }
@@ -657,15 +752,15 @@ class SessionMusicNotifier extends Notifier<SessionMusicState> {
   /// Restarts the track from the beginning at the layer implied by current reps.
   Future<void> restart() async {
     if (!state.started) return;
-    final layer = layerForReps(state.reps, state.repsPerLayer);
-    for (var i = 0; i < kLayerCount; i++) {
+    final layer = layerForReps(state.reps, state.repsPerLayer, _activeLayerCount);
+    for (var i = 0; i < _activeLayerCount; i++) {
       _fadeTimers[i]?.cancel();
       await _players[i].seek(Duration.zero);
       _layerGain[i] = i < layer ? 1.0 : 0.0;
       _pushStemVolume(i);
     }
     state = state.copyWith(ended: false, layer: layer, position: Duration.zero);
-    await Future.wait(_players.map((p) => p.play()));
+    await Future.wait(_players.take(_activeLayerCount).map((p) => p.play()));
     _syncStems();
   }
 

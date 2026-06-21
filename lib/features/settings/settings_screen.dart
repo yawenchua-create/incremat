@@ -11,6 +11,7 @@ import '../../providers/hardware_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/senior_provider.dart';
+import '../../providers/session_music_provider.dart';
 import '../auth/login_screen.dart';
 import '../session_music/session_music_screen.dart';
 import 'debug_screen.dart';
@@ -532,7 +533,9 @@ class _MusicCard extends ConsumerWidget {
   final Senior senior;
   const _MusicCard({required this.senior});
 
-  static const _tracks = ['甜蜜蜜', '半斤八两'];
+  // Derived from the single source of truth (kSongs) so every registered song
+  // appears here automatically — no need to also edit this list when adding one.
+  static final _tracks = kSongs.map((s) => s.id).toList();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
