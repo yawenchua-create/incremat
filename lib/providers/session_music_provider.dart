@@ -101,14 +101,12 @@ const List<SongOption> kSongs = [
     folder: 'overtherainbow',
     stems: ['other.mp3', 'bass.mp3', 'guitar.mp3', 'vocals.mp3'],
   ),
-  // "I Want It That Way" — a 3-layer build-up (piano → drums → vocals). The
-  // OTHER stem download was incomplete (.crdownload), so it's left out for now;
-  // drop a complete other.mp3 in the folder and add it here to make it 4 layers.
+  // "I Want It That Way" — a 4-layer build-up: piano → drums → other → vocals.
   SongOption(
     id: 'I Want It That Way',
     name: 'I Want It That Way',
     folder: 'iwantitthatway',
-    stems: ['piano.mp3', 'drums.mp3', 'vocals.mp3'],
+    stems: ['piano.mp3', 'drums.mp3', 'other.mp3', 'vocals.mp3'],
   ),
   // 中国话 (S.H.E) — a full 6-layer build-up using every stem:
   // drums → bass → guitar → piano → other (keys) → vocals.
